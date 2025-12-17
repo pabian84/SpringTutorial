@@ -104,8 +104,9 @@ export default function Dashboard() {
       marginTop: 0,
       marginBottom: '15px',
       fontSize: '18px',
-      color: '#aaa',
-      borderBottom: '1px solid #333',
+      color: '#ffffff',
+      fontWeight: 'bold',
+      borderBottom: '1px solid rgba(255,255,255,0.3)',
       paddingBottom: '10px',
     },
     placeholderBox: {
@@ -151,16 +152,21 @@ export default function Dashboard() {
                     overflow: 'hidden'
                 }} 
             >
-              <h3 style={styles.sectionTitle}>🌤 Local Weather</h3>
+              {/* 타이틀: 아이콘도 동적으로 변경 */}
+              <h3 style={styles.sectionTitle}>
+                {/* 작은 아이콘 적용 */}
+                {getWeatherStyle(weather.currentSky).smallIcon} 
+                Local Weather
+              </h3>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <span style={{ fontSize: '48px', fontWeight: 'bold' }}>{Math.round(weather.currentTemp)}°C</span>
-                  <div style={{ fontSize: '18px', opacity: 0.9 }}>{weather.currentSky}</div>
+                  <div style={{ fontSize: '18px', color: '#fff',opacity: 0.9 }}>{weather.currentSky}</div>
                 </div>
-                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  {/* 날씨 아이콘 표시 */}
-                  {getWeatherStyle(weather.currentSky).icon}
-                  <div style={{ fontSize: '16px', marginTop: '5px' }}>{weather.location}</div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold' }}>{weather.location}</div>
+                  {/* [수정] 안내 문구 색상 밝게 조정 */}
+                  <small style={{ color: 'rgba(255,255,255,0.7)' }}>클릭하여 주간 예보 확인 &rarr;</small>
                 </div>
               </div>
             </div>
