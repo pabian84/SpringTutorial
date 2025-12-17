@@ -1,85 +1,118 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; // [복구] 페이지 이동 훅 사용
-import { showAlert } from '../utils/Alert';
+import { useNavigate } from 'react-router-dom';
+import { IoIosArrowBack } from 'react-icons/io';
+import { getWeatherStyle, type DailyForecast } from '../utils/WeatherUtils';
 
-// [로직 유지] Dashboard.tsx에서 import 하므로 export 필수 유지
-export interface DailyForecast {
-  date: string;
-  temp: number;
-  sky: string;
-}
 
-interface WeatherDetailData {
+interface WeatherData {
   location: string;
-  // [로직 유지] 선생님 코드의 변수명 weeklyForecast 절대 유지
-  weeklyForecast: DailyForecast[];
+  currentTemp: number;
+  currentSky: string;
+  weeklyForecast: DailyForecast[]; 
 }
 
 export default function WeatherDetail() {
-  const navigate = useNavigate(); // [복구]
-  const [weather, setWeather] = useState<WeatherDetailData | null>(null);
+  const navigate = useNavigate();
+  const [weather, setWeather] = useState<WeatherData | null>(null);
 
   useEffect(() => {
-    // [로직 유지] API 호출 로직 100% 동일
-    axios.get('http://localhost:8080/api/weather')
-         .then(res => {
-            setWeather(res.data);
-         })
-         .catch(e => {
-            console.error(e);
-            showAlert('오류 발생', '날씨 정보 로딩 실패', 'error');
-         });
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          axios.get(`http://localhost:8080/api/weather?lat=${latitude}&lon=${longitude}`)
+               .then(res => setWeather(res.data));
+        },
+        () => axios.get('http://localhost:8080/api/weather').then(res => setWeather(res.data))
+      );
+    } else {
+      axios.get('http://localhost:8080/api/weather').then(res => setWeather(res.data));
+    }
   }, []);
 
   if (!weather) {
-    return <div style={{ padding: 20, minHeight: '100vh', backgroundColor: '#16213e', color: 'white' }}>Loading...</div>;
+    return <div style={{ color: 'white', textAlign: 'center', marginTop: 100 }}>Loading...</div>;
   }
 
+  const currentStyle = getWeatherStyle(weather.currentSky);
+
   return (
-    // [디자인] 전체 화면 다크 모드
-    <div style={{ padding: '20px', minHeight: '100vh', backgroundColor: '#16213e', color: 'white', display: 'flex', flexDirection: 'column' }}>
+    // [1] 전체 배경: 대시보드와 통일 (검은색 계열)
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#1a1a2e', // Dashboard와 통일감 있는 색상
+      color: '#eaeaea',
+      padding: '20px'
+    }}>
       
       {/* 헤더 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '24px' }}>{weather.location} Weekly Forecast</h1>
-        </div>
-        {/* [복구] navigate(-1)로 닫기(뒤로가기) */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
         <button 
           onClick={() => navigate(-1)} 
-          style={{ 
-            backgroundColor: '#e94560', color: 'white', border: 'none', 
-            padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' 
-          }}
+          style={{ background: 'none', border: 'none', color: '#eaeaea', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '18px' }}
         >
-          Close
+          <IoIosArrowBack size={24} /> Back
         </button>
       </div>
 
-      {/* 컨텐츠: 가로 스크롤 카드 UI */}
-      <div style={{ display: 'flex', overflowX: 'auto', gap: '15px', paddingBottom: '20px' }}>
-        <style>{`div::-webkit-scrollbar { display: none; }`}</style>
+      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         
-        {/* [로직 유지] weeklyForecast 매핑 로직 그대로 사용 */}
-        {weather.weeklyForecast.map((day, idx) => (
-          <div key={idx} style={{ 
-            flex: '0 0 auto', width: '120px', height: '180px', 
-            backgroundColor: '#1f2937', borderRadius: '16px', padding: '20px', 
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', 
-            border: '1px solid #333', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' 
-          }}>
-            <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#ddd' }}>
-              {day.date.substring(5)}
-            </span>
-            <span style={{ fontSize: '14px', color: '#aaa' }}>
-              {day.sky}
-            </span>
-            <span style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>
-              {day.temp}°C
-            </span>
-          </div>
-        ))}
+        {/* [2] 현재 날씨 카드 (iOS 스타일 패널) */}
+        <div style={{
+            background: currentStyle.bg,
+            borderRadius: '24px',
+            padding: '30px',
+            textAlign: 'center',
+            boxShadow: '0 10px 20px rgba(0,0,0,0.3)',
+            marginBottom: '30px',
+            color: 'white'
+        }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', margin: '0 0 10px 0' }}>{weather.location}</h2>
+            <div style={{ marginBottom: '10px' }}>{currentStyle.icon}</div>
+            <div style={{ fontSize: '64px', fontWeight: '300' }}>{Math.round(weather.currentTemp)}°</div>
+            <div style={{ fontSize: '20px', opacity: 0.9 }}>{weather.currentSky}</div>
+        </div>
+
+        {/* [3] 주간 예보 (각 요일별 카드 분리) */}
+        <h3 style={{ fontSize: '18px', color: '#aaa', marginBottom: '15px', paddingLeft: '5px' }}>
+            📅 주간 예보 (Weekly)
+        </h3>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {weather.weeklyForecast.map((day, idx) => {
+                // [중요] 각 날씨에 맞는 스타일 개별 적용
+                const dayStyle = getWeatherStyle(day.sky); 
+                
+                return (
+                    <div key={idx} style={{ 
+                        background: dayStyle.bg, // 각 카드의 배경색이 다름
+                        borderRadius: '16px',
+                        padding: '15px 25px',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
+                        color: 'white'
+                    }}>
+                        {/* 요일 */}
+                        <div style={{ width: '100px', fontWeight: 'bold', fontSize: '16px' }}>
+                            {new Date(day.date).toLocaleDateString('ko-KR', { weekday: 'long' })}
+                        </div>
+
+                        {/* 아이콘 */}
+                        <div style={{ flex: 1, textAlign: 'center' }}>
+                            {dayStyle.smallIcon}
+                        </div>
+
+                        {/* 온도 */}
+                        <div style={{ width: '60px', textAlign: 'right', fontWeight: 'bold', fontSize: '20px' }}>
+                            {Math.round(day.temp)}°
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
       </div>
     </div>
   );

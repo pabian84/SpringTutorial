@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import type { DailyForecast } from './WeatherDetail';
 import MapWidget from '../components/MapWidget';
 import ServerMonitor from '../components/Servermonitor';
 import MemoWidget from '../components/MemoWidget';
+import { getWeatherStyle, type DailyForecast } from '../utils/WeatherUtils';
 
 interface UserData {
   id: string;
@@ -138,24 +138,35 @@ export default function Dashboard() {
       {/* 2. 메인 그리드 영역 */}
       <div style={styles.grid}>
         
-        {/* [왼쪽 위] 날씨 위젯 */}
-        <div style={{ ...styles.card, cursor: 'pointer', background: 'linear-gradient(135deg, #0f3460 0%, #16213e 100%)' }} onClick={() => navigate('/weather')}>
-          <h3 style={styles.sectionTitle}>🌤 Local Weather</h3>
-          {weather ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <span style={{ fontSize: '48px', fontWeight: 'bold' }}>{weather.currentTemp}°C</span>
-                <div style={{ fontSize: '18px', color: '#ccc' }}>{weather.currentSky}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '20px' }}>{weather.location}</div>
-                <small style={{ color: '#aaa' }}>클릭하여 주간 예보 확인 &rarr;</small>
+        {/* [왼쪽 위] 날씨 위젯 (스타일 적용됨) */}
+        {weather ? (
+            <div 
+                onClick={() => navigate('/weather')}
+                style={{ 
+                    ...styles.card, 
+                    cursor: 'pointer', 
+                    // [핵심] 날씨에 따라 배경색 변경
+                    background: getWeatherStyle(weather.currentSky).bg,
+                    position: 'relative',
+                    overflow: 'hidden'
+                }} 
+            >
+              <h3 style={styles.sectionTitle}>🌤 Local Weather</h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <span style={{ fontSize: '48px', fontWeight: 'bold' }}>{Math.round(weather.currentTemp)}°C</span>
+                  <div style={{ fontSize: '18px', opacity: 0.9 }}>{weather.currentSky}</div>
+                </div>
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  {/* 날씨 아이콘 표시 */}
+                  {getWeatherStyle(weather.currentSky).icon}
+                  <div style={{ fontSize: '16px', marginTop: '5px' }}>{weather.location}</div>
+                </div>
               </div>
             </div>
           ) : (
-            <div>Loading Weather...</div>
-          )}
-        </div>
+            <div style={styles.card}>Loading Weather...</div>
+        )}
 
         {/* [오른쪽 위] 온라인 접속자 리스트 */}
         <div style={{ ...styles.card, gridRow: 'span 2' }}> {/* 세로로 길게 쓰기 */}

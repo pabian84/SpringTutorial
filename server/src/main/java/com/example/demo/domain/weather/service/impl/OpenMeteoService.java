@@ -35,7 +35,7 @@ public class OpenMeteoService implements WeatherProvider {
             List<Double> temps = (List<Double>) daily.get("temperature_2m_max");
             List<Integer> codes = (List<Integer>) daily.get("weathercode");
 
-            for(int i=0; i<Math.min(5, times.size()); i++) {
+            for(int i=0; i<Math.min(7, times.size()); i++) {
                 Map<String, Object> day = new HashMap<>();
                 day.put("date", times.get(i));
                 day.put("temp", temps.get(i));
