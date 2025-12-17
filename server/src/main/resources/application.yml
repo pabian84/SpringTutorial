@@ -1,0 +1,35 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: demo
+  datasource:
+    #url: jdbc:h2:mem:testdb;MODE=MySQL
+    # 파일 기반 MySQL DB, 자동 서버, 파일 잠금 방지 (데이터 유지용)
+    url: jdbc:h2:file:./data/demo;MODE=MySQL;AUTO_SERVER=TRUE
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  sql:
+    init:
+      mode: always
+      continue-on-error: true  # 에러가 나도 무시하고 진행 (기존 테이블 삭제용)
+
+# Swagger 설정 (문서 접속 주소: /swagger-ui/index.html)
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    groups-order: DESC
+    operations-sorter: method
+    disable-swagger-default-url: true
+    display-request-duration: true
+  api-docs:
+    path: /api-docs
+  show-actuator: true
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json

@@ -1,0 +1,22 @@
+# --- Java & Spring Boot ---
+target/
+*.class
+.idea/
+*.iml
+.mvn/
+mvnw
+mvnw.cmd
+.gradle/
+build/
+
+# --- React & Node.js ---
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+coverage/
+
+# --- Database ---
+*.mv.db
+*.trace.db
