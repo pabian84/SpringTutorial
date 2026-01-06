@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import MapWidget from '../components/MapWidget';
@@ -7,7 +7,7 @@ import MemoWidget from '../components/MemoWidget';
 import { getWeatherStyle, type DailyForecast } from '../utils/WeatherUtils';
 import { useQuery } from '@tanstack/react-query'; // 임포트 추가
 import { showAlert } from '../utils/Alert';
-import ChatWidget from '../components/ChatWidget';
+import ChatWidget, { type ChatMessage } from '../components/ChatWidget'; 
 import { BiExpand, BiX } from 'react-icons/bi';
 
 interface UserData {
@@ -31,6 +31,10 @@ export default function Dashboard() {
     lon: 127.177553
   });
   const [isChatExpanded, setIsChatExpanded] = useState(false);
+
+  // [1] 채팅 상태를 Dashboard에서 관리 (Lifting State Up)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (!myId) {
@@ -57,7 +61,7 @@ export default function Dashboard() {
     }
   }, [myId, navigate]);
 
-  // --- [수정 1] 접속자 리스트 (React Query 적용) ---
+  // 접속자 리스트 (React Query 적용) ---
   const { data: onlineUsers = [] } = useQuery({
     queryKey: ['onlineUsers'], // 캐싱을 위한 고유 키
     queryFn: async () => {
@@ -67,7 +71,7 @@ export default function Dashboard() {
     refetchInterval: 5000, // 5초마다 자동 갱신 (실시간 효과)
   });
 
-  // --- [수정 2] 날씨 정보 (React Query 적용) ---
+  // 날씨 정보 (React Query 적용) ---
   // queryKey에 좌표(lat, lon)를 포함시켜, 위치가 바뀌면 자동으로 데이터를 다시 가져옵니다.
   const { data: weather } = useQuery({
     queryKey: ['weather', myLocation.lat, myLocation.lon], 
@@ -76,6 +80,61 @@ export default function Dashboard() {
       return res.data as WeatherData;
     }
   });
+
+  // [신규] 채팅 기록 불러오기 (React Query) -> DB에 저장된 이전 대화 로드
+  useQuery({
+    queryKey: ['chatHistory'],
+    queryFn: async () => {
+      try {
+        const res = await axios.get('http://localhost:8080/api/chat/history');
+        // [핵심] 서버 응답이 배열인지 꼭 확인해야 함! (DB 에러 시 객체가 옴)
+        if (Array.isArray(res.data)) {
+           setChatMessages(res.data);
+        } else {
+           console.warn("채팅 기록 형식이 올바르지 않습니다(DB 확인 필요):", res.data);
+           setChatMessages([]); // 안전하게 빈 배열로 초기화
+        }
+        return res.data;
+      } catch (e) {
+        console.error("채팅 기록 로드 실패", e);
+        return [];
+      }
+    },
+    refetchOnWindowFocus: false, // 창 왔다갔다 할 때마다 다시 부르지 않음
+  });
+
+  // Chatting WebSocket 연결 (Dashboard가 켜질 때 한 번만 연결)
+  useEffect(() => {
+    ws.current = new WebSocket('ws://localhost:8080/ws/chat');
+    
+    ws.current.onopen = () => console.log("채팅 서버 연결 성공");
+    ws.current.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // 메시지가 유효한 객체인지 확인 후 추가
+        if (data && typeof data === 'object') {
+          // 메시지 오면 리스트에 추가 (작은 창, 큰 창 모두 반영됨)
+          setChatMessages(prev => [...prev, data]);
+        }
+      } catch (e) {
+        console.error("메시지 파싱 에러:", e);
+      }
+    };
+
+    return () => {
+      ws.current?.close();
+    };
+  }, []);
+
+  // 메시지 전송 함수 (ChatWidget에게 전달할 함수)
+  const handleSendMessage = (text: string) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN && myId) {
+      const msgData = { sender: myId, text: text };
+      ws.current.send(JSON.stringify(msgData));
+    } else {
+        console.error("채팅 서버가 연결되지 않았습니다.");
+    }
+  };
 
   const logout = async () => {
     // 로그아웃 시 DB 상태 업데이트 요청
@@ -267,20 +326,12 @@ export default function Dashboard() {
             {/* 3. [신규] 실시간 채팅 (미니 뷰) */}
             <div style={styles.card}>
                 <h3 style={styles.sectionTitle}>
-                    💬 Chat
-                    {/* 확장 버튼 */}
-                    <button 
-                      onClick={() => setIsChatExpanded(true)}
-                      style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '20px' }}
-                      title="크게 보기"
-                    >
-                      <BiExpand /> {/* 아이콘이 없으면 'ㅁ' 같은 텍스트로 대체 가능 */}
-                    </button>
+                  💬 Chat 
+                  <button onClick={() => setIsChatExpanded(true)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '20px' }}>
+                    <BiExpand />
+                  </button>
                 </h3>
-                <div style={{ height: '250px', width: '100%' }}>
-                    {/* myId는 반드시 넘겨줘야 합니다 */}
-                    <ChatWidget myId={myId!} />
-                </div>
+                <div style={{ height: '250px', width: '100%' }}><ChatWidget myId={myId!} messages={chatMessages} onSendMessage={handleSendMessage} /></div>
             </div>
         </div>
 
@@ -289,21 +340,12 @@ export default function Dashboard() {
       {/* [신규] 채팅 확장 모달 (isChatExpanded가 true일 때만 표시) */}
       {isChatExpanded && (
         <div style={styles.modalOverlay} onClick={() => setIsChatExpanded(false)}>
-          {/* 모달 내용 (클릭 시 닫히지 않도록 stopPropagation) */}
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', borderBottom: '1px solid #444', paddingBottom: '10px' }}>
               <h2 style={{ margin: 0, color: 'white' }}>💬 Live Chat Room</h2>
-              <button 
-                onClick={() => setIsChatExpanded(false)}
-                style={{ background: 'none', border: 'none', color: 'white', fontSize: '28px', cursor: 'pointer' }}
-              >
-                <BiX /> {/* 닫기 아이콘 */}
-              </button>
+              <button onClick={() => setIsChatExpanded(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '28px', cursor: 'pointer' }}><BiX /></button>
             </div>
-            {/* 크게 보이는 채팅 위젯 */}
-            <div style={{ flex: 1 }}>
-              <ChatWidget myId={myId!} />
-            </div>
+            <div style={{ flex: 1 }}><ChatWidget myId={myId!} messages={chatMessages} onSendMessage={handleSendMessage} /></div>
           </div>
         </div>
       )}

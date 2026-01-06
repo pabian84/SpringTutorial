@@ -1,122 +1,98 @@
 import { useEffect, useState, useRef } from 'react';
 
-interface ChatMessage {
+export interface ChatMessage {
   sender: string;
   text: string;
 }
 
 interface ChatWidgetProps {
   myId: string;
+  messages: ChatMessage[];
+  onSendMessage: (text: string) => void;
 }
 
-export default function ChatWidget({ myId }: ChatWidgetProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export default function ChatWidget({ myId, messages, onSendMessage }: ChatWidgetProps) {
   const [input, setInput] = useState('');
-  const ws = useRef<WebSocket | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // 채팅 서버 연결
-    ws.current = new WebSocket('ws://localhost:8080/ws/chat');
-    ws.current.onopen = () => console.log('채팅 서버 연결됨');
-    
-    ws.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      // 서버에서 온 메시지를 리스트에 추가
-      setMessages(prev => [...prev, data]);
-    };
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
 
-    return () => {
-      ws.current?.close();
-    };
-  }, []);
-
-  const sendMessage = () => {
-    if (ws.current && input.trim()) {
-      const msgData = { sender: myId, text: input };
-      // 서버로 전송 (JSON 문자열로 변환)
-      ws.current.send(JSON.stringify(msgData));
+  const handleSend = () => {
+    if (input.trim()) {
+      onSendMessage(input);
       setInput('');
     }
   };
 
-  // --- 스타일 정의 ---
   const styles = {
     container: {
-      display: 'flex',
-      flexDirection: 'column' as const,
-      height: '100%',
-      backgroundColor: '#1f1f35', // 약간 더 어두운 배경
-      borderRadius: '12px',
-      overflow: 'hidden',
+      display: 'flex', flexDirection: 'column' as const, height: '100%',
+      backgroundColor: '#1f1f35', borderRadius: '12px', overflow: 'hidden',
     },
     messageArea: {
-      flex: 1,
-      overflowY: 'auto' as const,
-      padding: '15px',
-      display: 'flex',
-      flexDirection: 'column' as const,
-      gap: '10px',
+      flex: 1, overflowY: 'auto' as const, padding: '15px',
+      display: 'flex', flexDirection: 'column' as const, gap: '10px',
     },
-    myMsg: {
-      alignSelf: 'flex-end',
-      backgroundColor: '#007bff', // 파란색 말풍선
-      color: 'white',
-      padding: '8px 12px',
-      borderRadius: '12px 12px 0 12px', // 오른쪽 아래 뾰족하게
-      maxWidth: '70%',
-      wordBreak: 'break-all' as const,
-      fontSize: '14px'
-    },
-    otherMsg: {
-      alignSelf: 'flex-start',
-      backgroundColor: '#3a3a55', // 회색 말풍선
-      color: '#eaeaea',
-      padding: '8px 12px',
-      borderRadius: '12px 12px 12px 0', // 왼쪽 아래 뾰족하게
-      maxWidth: '70%',
-      wordBreak: 'break-all' as const,
-      fontSize: '14px'
-    },
-    senderName: {
-      fontSize: '11px',
-      color: '#aaa',
-      marginBottom: '4px',
-      display: 'block'
-    },
+    myMsg: { alignSelf: 'flex-end', backgroundColor: '#007bff', color: 'white', padding: '8px 12px', borderRadius: '12px 12px 0 12px', maxWidth: '70%', wordBreak: 'break-all' as const, fontSize: '14px' },
+    otherMsg: { alignSelf: 'flex-start', backgroundColor: '#3a3a55', color: '#eaeaea', padding: '8px 12px', borderRadius: '12px 12px 12px 0', maxWidth: '70%', wordBreak: 'break-all' as const, fontSize: '14px' },
+    senderName: { fontSize: '11px', color: '#aaa', marginBottom: '4px', display: 'block' },
+    
+    // [입력창 영역]
     inputArea: {
       display: 'flex',
-      padding: '10px',
+      padding: '8px', 
       borderTop: '1px solid #333',
       backgroundColor: '#252540',
-      gap: '10px' // 입력창과 버튼 사이 간격
+      gap: '8px',
+      alignItems: 'center' 
     },
+    // [입력 필드]
     input: {
-      flex: 1, // 남은 공간 다 차지하기
-      padding: '10px',
-      borderRadius: '8px',
+      flex: 1,
+      height: '36px', 
+      boxSizing: 'border-box' as const,
+      padding: '0 15px', 
+      borderRadius: '18px', 
       border: '1px solid #444',
       backgroundColor: '#1a1a2e',
       color: 'white',
-      outline: 'none'
+      outline: 'none',
+      fontSize: '14px'
     },
+    // [전송 버튼 - 강력 고정]
     button: {
-      width: '70px',
+      height: '36px',         
+      width: 'auto',          // [추가] 너비 자동
+      minWidth: '60px',       // [추가] 최소 너비 확보
+      flexShrink: 0,          // [추가] 절대 찌그러지지 않음
+      margin: 0,              // [추가] 브라우저 기본 마진 제거
+      boxSizing: 'border-box' as const,
+      padding: '0 20px',      
       backgroundColor: '#007bff',
       color: 'white',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: '18px',   
       fontWeight: 'bold',
+      fontSize: '13px',
       cursor: 'pointer',
-      transition: 'background 0.2s'
+      whiteSpace: 'nowrap' as const,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     }
   };
 
+  // messages가 유효한지 확인하고 렌더링 (방어 코드)
+  const safeMessages = Array.isArray(messages) ? messages : [];
+
   return (
     <div style={styles.container}>
-      {/* 채팅 내용 영역 */}
       <div ref={scrollRef} style={styles.messageArea}>
-        {messages.map((msg, idx) => {
+        {safeMessages.map((msg, idx) => {
           const isMe = msg.sender === myId;
           return (
             <div key={idx} style={isMe ? styles.myMsg : styles.otherMsg}>
@@ -126,24 +102,15 @@ export default function ChatWidget({ myId }: ChatWidgetProps) {
           );
         })}
       </div>
-      
-      {/* 입력창 */}
       <div style={styles.inputArea}>
         <input 
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && sendMessage()}
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
           style={styles.input}
           placeholder="메시지 입력..."
         />
-        <button 
-          onClick={sendMessage} 
-          style={styles.button}
-          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0056b3'}
-          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#007bff'}
-        >
-          전송
-        </button>
+        <button onClick={handleSend} style={styles.button}>전송</button>
       </div>
     </div>
   );
