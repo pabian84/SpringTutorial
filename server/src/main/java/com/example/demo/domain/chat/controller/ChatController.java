@@ -1,10 +1,11 @@
 package com.example.demo.domain.chat.controller;
 
+import com.example.demo.domain.chat.dto.ChatHistoryRes;
 import com.example.demo.domain.chat.mapper.ChatMapper;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
-import java.util.Map;
+
 
 @RestController
 public class ChatController {
@@ -15,7 +16,7 @@ public class ChatController {
     }
 
     @GetMapping("/api/chat/history")
-    public List<Map<String, Object>> getChatHistory() {
+    public List<ChatHistoryRes> getChatHistory() {
         return chatMapper.getRecentMessages();
     }
 }

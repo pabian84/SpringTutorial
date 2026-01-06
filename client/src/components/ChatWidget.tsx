@@ -42,47 +42,51 @@ export default function ChatWidget({ myId, messages, onSendMessage }: ChatWidget
     senderName: { fontSize: '11px', color: '#aaa', marginBottom: '4px', display: 'block' },
     
     // [입력창 영역]
+    // [MemoWidget과 스타일 통일]
     inputArea: {
       display: 'flex',
-      padding: '8px', 
+      height: '50px',
+      padding: '7px 10px',      // 여백을 넉넉하게
+      //alignItems: 'center',
       borderTop: '1px solid #333',
       backgroundColor: '#252540',
-      gap: '8px',
-      alignItems: 'center' 
+      gap: '8px',           // 입력창과 버튼 사이 간격
+      alignItems: 'center',
+      boxSizing: 'border-box' as const
     },
-    // [입력 필드]
+    // [입력 필드 - MemoWidget 스타일 적용]
     input: {
       flex: 1,
-      height: '36px', 
+      height: '100%',       // 부모(inputArea) 높이에 꽉 차게 (패딩 제외)
       boxSizing: 'border-box' as const,
-      padding: '0 15px', 
-      borderRadius: '18px', 
+      padding: '0 12px',
+      margin: 0, 
+      borderRadius: '8px',  // [수정] 18px -> 8px (Memo와 통일)
       border: '1px solid #444',
-      backgroundColor: '#1a1a2e',
+      backgroundColor: '#1a1a2e', // Memo와 색상은 맞춤
       color: 'white',
       outline: 'none',
       fontSize: '14px'
     },
-    // [전송 버튼 - 강력 고정]
+    // [전송 버튼 - MemoWidget 스타일 적용]
     button: {
-      height: '36px',         
-      width: 'auto',          // [추가] 너비 자동
-      minWidth: '60px',       // [추가] 최소 너비 확보
-      flexShrink: 0,          // [추가] 절대 찌그러지지 않음
-      margin: 0,              // [추가] 브라우저 기본 마진 제거
+      height: '100%',       // 부모 높이에 맞춤
+      width: '60px',        // Memo와 동일하게 60px 고정
+      flexShrink: 0,
+      margin: 0,
       boxSizing: 'border-box' as const,
-      padding: '0 20px',      
-      backgroundColor: '#007bff',
+      padding: 0,           // 텍스트 중앙 정렬을 위해 패딩 제거
+      backgroundColor: '#007bff', // 색상은 채팅 테마 유지 (Memo는 빨강)
       color: 'white',
       border: 'none',
-      borderRadius: '18px',   
+      borderRadius: '8px',  // [수정] 18px -> 8px (Memo와 통일)
       fontWeight: 'bold',
-      fontSize: '13px',
+      fontSize: '14px',     // 13px -> 14px
       cursor: 'pointer',
-      whiteSpace: 'nowrap' as const,
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      transition: 'background 0.2s'
     }
   };
 
@@ -102,15 +106,26 @@ export default function ChatWidget({ myId, messages, onSendMessage }: ChatWidget
           );
         })}
       </div>
+      {/* 폼 태그로 감싸서 엔터키 전송 자연스럽게 처리 */}
       <div style={styles.inputArea}>
-        <input 
+        <input
+          name="chat-input"
+          id="chat-input"
+          autoComplete="off"
+          spellCheck={false}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
           style={styles.input}
           placeholder="메시지 입력..."
         />
-        <button onClick={handleSend} style={styles.button}>전송</button>
+        <button
+            onClick={handleSend} style={styles.button}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0056b3' }
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#007bff'}
+        >
+            전송
+        </button>
       </div>
     </div>
   );

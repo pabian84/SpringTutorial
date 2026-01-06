@@ -4,8 +4,11 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+
+import com.example.demo.domain.chat.dto.ChatHistoryRes;
+
 import java.util.List;
-import java.util.Map;
+
 
 @Mapper
 public interface ChatMapper {
@@ -15,5 +18,5 @@ public interface ChatMapper {
 
     // 최근 메시지 50개 가져오기
     @Select("SELECT sender_id as sender, message as text FROM chat_log ORDER BY created_at ASC LIMIT 50")
-    List<Map<String, Object>> getRecentMessages();
+    List<ChatHistoryRes> getRecentMessages();
 }
