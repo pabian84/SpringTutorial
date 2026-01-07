@@ -17,6 +17,6 @@ public interface ChatMapper {
     void saveMessage(@Param("sender") String sender, @Param("text") String text);
 
     // 최근 메시지 50개 가져오기
-    @Select("SELECT sender_id as sender, message as text FROM chat_log ORDER BY created_at ASC LIMIT 50")
+    @Select("SELECT sender_id as sender, message as text, FORMATDATETIME(created_at, 'yyyy-MM-dd''T''HH:mm:ss') as createdAt FROM chat_log ORDER BY created_at ASC LIMIT 50")
     List<ChatHistoryRes> getRecentMessages();
 }

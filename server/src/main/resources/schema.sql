@@ -35,3 +35,9 @@ CREATE TABLE if not exists chat_log (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_id) REFERENCES users(id)
 );
+
+-- INSERT INTO users (id, name, password, is_online) VALUES ('admin1', '관리자1', '1234', false);
+-- INSERT INTO users (id, name, password, is_online) VALUES ('admin2', '관리자2', '1234', false);
+-- INSERT INTO users (id, name, password, is_online) VALUES ('admin3', '관리자3', '1234', false);
+-- INSERT INTO users (id, name, password, is_online) VALUES ('admin4', '관리자4', '1234', false);
+-- INSERT INTO users (id, name, password, is_online) VALUES ('admin5', '관리자5', '1234', false);

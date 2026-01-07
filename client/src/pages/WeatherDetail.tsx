@@ -1,119 +1,444 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { IoIosArrowBack } from 'react-icons/io';
-import { getWeatherStyle, type DailyForecast } from '../utils/WeatherUtils';
+import { IoIosArrowBack, IoMdClose } from 'react-icons/io';
+import { IoWater, IoSpeedometer, IoThermometer, IoUmbrella, IoTime, IoSunny, IoMoon } from 'react-icons/io5';
+import { 
+  WiDaySunny, WiCloudy, WiRain, WiSnow, WiDayCloudy, WiFog, 
+  WiNightClear, WiNightAltCloudy, WiNightAltRain, WiNightAltSnow, WiNightAltShowers, WiNightAltThunderstorm,
+  WiSunrise, WiSunset, WiThunderstorm, WiShowers 
+} from 'react-icons/wi';
+import { motion, AnimatePresence } from 'framer-motion';
 
+// --- 인터페이스 정의 ---
+interface HourlyData {
+  time: string;
+  temp: number;
+  sky: string;
+  type?: string; 
+  isNight?: boolean;
+}
+
+interface DailyData {
+  date: string;
+  maxTemp: number;
+  minTemp: number;
+  sky: string;
+  rainChance: number;
+}
 
 interface WeatherData {
   location: string;
   currentTemp: number;
   currentSky: string;
-  weeklyForecast: DailyForecast[]; 
+  feelsLike: number;
+  humidity: number;
+  windSpeed: number;
+  uvIndex: number;
+  rainChance: number;
+  pressure: number;
+  sunrise: string;
+  sunset: string;
+  hourlyForecast: HourlyData[];
+  weeklyForecast: DailyData[];
 }
+
+interface DetailBoxProps {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  value: string | number;
+  unit?: string;
+  desc: string;
+  onClick: (id: string) => void;
+}
+
+const containerStyle: React.CSSProperties = {
+  backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  backdropFilter: 'blur(20px)',
+  borderRadius: '16px',
+  padding: '16px',
+  marginBottom: '12px',
+  boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+  overflow: 'hidden',
+  position: 'relative',
+  zIndex: 10
+};
+
+const headerStyle: React.CSSProperties = {
+  fontSize: '12px', fontWeight: 600, opacity: 0.7, 
+  marginBottom: '12px', textTransform: 'uppercase', display:'flex', alignItems:'center', gap:'5px',
+  borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom:'8px'
+};
+
+// --- 헬퍼 함수 ---
+const getMinutes = (timeStr: string) => {
+  if (!timeStr || !timeStr.includes(':')) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+};
+
+const checkIsNight = (targetTimeStr: string, sunrise: string, sunset: string) => {
+  if (!targetTimeStr || !sunrise || !sunset) return false;
+  
+  let targetM = 0;
+  if (targetTimeStr.includes(':')) {
+     targetM = getMinutes(targetTimeStr);
+  } else {
+     return false; 
+  }
+
+  const sunriseM = getMinutes(sunrise);
+  const sunsetM = getMinutes(sunset);
+  
+  return targetM >= sunsetM || targetM < sunriseM;
+};
+
+const DetailBox = ({ id, title, icon, value, unit = "", desc, onClick }: DetailBoxProps) => (
+  <motion.div layoutId={id} onClick={() => onClick(id)} whileTap={{ scale: 0.95 }}
+    style={{ ...containerStyle, marginBottom: 0, height: '150px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', cursor: 'pointer' }}>
+    <motion.div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', opacity: 0.8, fontWeight: 600 }}>
+      {icon} {title}
+    </motion.div>
+    <motion.div>
+      <div style={{ fontSize: '32px', fontWeight: 500 }}>
+        {value}<span style={{ fontSize: '20px', opacity: 0.8 }}>{unit}</span>
+      </div>
+    </motion.div>
+    <motion.div style={{ fontSize: '13px', opacity: 0.9 }}>{desc}</motion.div>
+  </motion.div>
+);
+
+const getDynamicBackground = (sky: string, isNight: boolean) => {
+  if (isNight) {
+    if (sky.includes('비') || sky.includes('소나기')) return 'linear-gradient(180deg, #000000 0%, #434343 100%)';
+    if (sky.includes('눈')) return 'linear-gradient(180deg, #232526 0%, #414345 100%)';
+    if (sky.includes('흐림') || sky.includes('구름')) return 'linear-gradient(180deg, #2c3e50 0%, #3498db 100%)';
+    return 'linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%)';
+  }
+
+  if (sky.includes('맑음')) return 'linear-gradient(180deg, #5CA0F2 0%, #87CEFA 100%)';
+  if (sky.includes('비') || sky.includes('소나기')) return 'linear-gradient(180deg, #374151 0%, #111827 100%)';
+  if (sky.includes('흐림') || sky.includes('구름')) return 'linear-gradient(180deg, #6b7280 0%, #374151 100%)';
+  if (sky.includes('눈')) return 'linear-gradient(180deg, #9ca3af 0%, #4b5563 100%)';
+  if (sky.includes('폭풍우')) return 'linear-gradient(180deg, #1f2937 0%, #000000 100%)';
+  return 'linear-gradient(180deg, #5CA0F2 0%, #87CEFA 100%)';
+};
+
+const getIcon = (sky: string, size: number, isNight: boolean = false) => {
+  const props = { size, color: "#fff" };
+  
+  // [수정] 일출: 아래에서 위로 둥둥 떠오르는 효과 + 밝기 조절
+  if (sky === '일출') {
+    return (
+      <motion.div 
+        animate={{ y: [3, -3, 3], opacity: [0.7, 1, 0.7] }} 
+        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+      >
+        <WiSunrise {...props} color="#FFD700" />
+      </motion.div>
+    );
+  }
+
+  // [수정] 일몰: 위에서 아래로 가라앉는 효과 + 밝기 조절
+  if (sky === '일몰') {
+    return (
+      <motion.div 
+        animate={{ y: [-3, 3, -3], opacity: [1, 0.7, 1] }} 
+        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+      >
+        <WiSunset {...props} color="#FFA500" />
+      </motion.div>
+    );
+  }
+
+  // 밤 아이콘
+  if (isNight) {
+    if (sky.includes('구름조금')) {
+       return <motion.div animate={{ x: [-2, 2, -2] }} transition={{ repeat: Infinity, duration: 4 }}><WiNightAltCloudy {...props} /></motion.div>;
+    }
+    if (sky.includes('비')) {
+       return <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 1.2 }}><WiNightAltRain {...props} /></motion.div>;
+    }
+    if (sky.includes('소나기')) {
+       return <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 0.8 }}><WiNightAltShowers {...props} /></motion.div>;
+    }
+    if (sky.includes('눈')) {
+       return <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity, duration: 3 }}><WiNightAltSnow {...props} /></motion.div>;
+    }
+    if (sky.includes('폭풍우')) {
+       return <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 0.5 }}><WiNightAltThunderstorm {...props} /></motion.div>;
+    }
+    if (sky.includes('흐림') || sky.includes('구름')) {
+       return <motion.div animate={{ x: [-3, 3, -3] }} transition={{ repeat: Infinity, duration: 5 }}><WiCloudy {...props} /></motion.div>;
+    }
+    // 기본 맑은 밤
+    return <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}><WiNightClear {...props} /></motion.div>;
+  }
+
+  // 낮 아이콘
+  if (sky.includes('맑음')) {
+    return <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 12, ease: "linear" }}><WiDaySunny {...props} /></motion.div>;
+  }
+  if (sky.includes('구름조금')) {
+    return <motion.div animate={{ y: [0, -3, 0], scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}><WiDayCloudy {...props} /></motion.div>;
+  }
+  if (sky.includes('흐림') || sky.includes('구름')) {
+    return <motion.div animate={{ x: [-3, 3, -3] }} transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}><WiCloudy {...props} /></motion.div>;
+  }
+  if (sky.includes('소나기')) {
+    return <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 0.8 }}><WiShowers {...props} /></motion.div>;
+  }
+  if (sky.includes('비')) {
+    return <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 1.2 }}><WiRain {...props} /></motion.div>;
+  }
+  if (sky.includes('눈')) {
+    return <motion.div animate={{ rotate: [0, 10, -10, 0], y: [0, 3, 0] }} transition={{ repeat: Infinity, duration: 3 }}><WiSnow {...props} /></motion.div>;
+  }
+  if (sky.includes('안개')) {
+     return <motion.div animate={{ opacity: [0.5, 0.8, 0.5] }} transition={{ repeat: Infinity, duration: 4 }}><WiFog {...props} /></motion.div>;
+  }
+  if (sky.includes('폭풍우')) {
+    return <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 0.5 }}><WiThunderstorm {...props} /></motion.div>;
+  }
+  
+  return <motion.div animate={{ y: [0, -3, 0], scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}><WiDayCloudy {...props} /></motion.div>;
+};
+
+const getBackgroundIcon = (sky: string, isNight: boolean) => {
+  const style: React.CSSProperties = {
+    position: 'absolute', top: '2%', right: '-10px',
+    opacity: 0.1, zIndex: 0
+  };
+  const size = 300;
+
+  if (isNight) {
+      if (sky.includes('비') || sky.includes('소나기')) return <motion.div style={style} animate={{ y: [0, 20, 0] }} transition={{ repeat: Infinity, duration: 2 }}><IoWater size={size} /></motion.div>;
+      return <motion.div style={style} animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 5 }}><IoMoon size={size} /></motion.div>;
+  }
+
+  if (sky.includes('맑음')) {
+    return <motion.div style={style} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 60, ease: "linear" }}><IoSunny size={size} /></motion.div>;
+  }
+  if (sky.includes('비') || sky.includes('소나기')) {
+    return <motion.div style={style} animate={{ y: [0, 20, 0] }} transition={{ repeat: Infinity, duration: 2 }}><IoWater size={size} /></motion.div>;
+  }
+  if (sky.includes('눈')) {
+     return <motion.div style={style} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 30 }}><WiSnow size={size} /></motion.div>;
+  }
+  return <motion.div style={style} animate={{ x: [0, 20, 0] }} transition={{ repeat: Infinity, duration: 10 }}><WiCloudy size={size} /></motion.div>;
+};
+
+const getDetailContent = (id: string, w: WeatherData) => {
+    switch (id) {
+      case 'uv': return { title: '자외선 지수', val: w.uvIndex, desc: '오늘 자외선 수치입니다.', icon: <IoSunny /> };
+      case 'sunset': return { title: '일몰', val: w.sunset, desc: `일출 시간은 ${w.sunrise}입니다.`, icon: <IoTime /> };
+      case 'wind': return { title: '바람', val: `${w.windSpeed}`, unit: 'm/s', desc: '현재 풍속입니다.', icon: <IoSpeedometer /> };
+      case 'rain': return { title: '강수확률', val: `${w.rainChance}`, unit: '%', desc: '오늘 예상 강수확률입니다.', icon: <IoUmbrella /> };
+      case 'feels': return { title: '체감 온도', val: `${Math.round(w.feelsLike)}`, unit: '°', desc: '바람에 따라 달라집니다.', icon: <IoThermometer /> };
+      case 'humid': return { title: '습도', val: `${w.humidity}`, unit: '%', desc: '현재 습도입니다.', icon: <IoWater /> };
+      case 'pressure': return { title: '기압', val: `${Math.round(w.pressure)}`, unit: 'hPa', desc: '현재 대기압입니다.', icon: <IoSpeedometer /> };
+      case 'visibility': return { title: '가시거리', val: '24', unit: 'km', desc: '가시거리가 좋습니다.', icon: <WiCloudy /> };
+      default: return null;
+    }
+  };
 
 export default function WeatherDetail() {
   const navigate = useNavigate();
   const [weather, setWeather] = useState<WeatherData | null>(null);
-
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dragConstraint, setDragConstraint] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
+    const fetchWeather = async (lat?: number, lon?: number) => {
+      try {
+        const url = lat ? `http://localhost:8080/api/weather?lat=${lat}&lon=${lon}` : 'http://localhost:8080/api/weather';
+        const res = await axios.get(url);
+        setWeather(res.data);
+      } catch (e) { console.error(e); }
+    };
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          axios.get(`http://localhost:8080/api/weather?lat=${latitude}&lon=${longitude}`)
-               .then(res => setWeather(res.data));
-        },
-        () => axios.get('http://localhost:8080/api/weather').then(res => setWeather(res.data))
-      );
-    } else {
-      axios.get('http://localhost:8080/api/weather').then(res => setWeather(res.data));
-    }
+      navigator.geolocation.getCurrentPosition((pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude), () => fetchWeather());
+    } else { fetchWeather(); }
   }, []);
 
-  if (!weather) {
-    return <div style={{ color: 'white', textAlign: 'center', marginTop: 100 }}>Loading...</div>;
-  }
+  const isCurrentNight = useMemo(() => {
+    if (!weather) return false;
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    return checkIsNight(`${h}:${m}`, weather.sunrise, weather.sunset);
+  }, [weather]);
 
-  const currentStyle = getWeatherStyle(weather.currentSky);
+  const processedHourly = useMemo(() => {
+    if (!weather) return [];
+    
+    return weather.hourlyForecast.map((hour) => {
+      if (hour.type === 'special') return { ...hour, isNight: false };
+
+      const isNight = checkIsNight(hour.time, weather.sunrise, weather.sunset);
+      
+      let displaySky = hour.sky;
+      if (isNight && hour.sky === '맑음') {
+        displaySky = '맑은밤';
+      }
+      // [수정 완료] 이제 sky 값을 displaySky로 덮어써서 반환합니다.
+      return { ...hour, sky: displaySky, isNight }; 
+    });
+  }, [weather]);
+
+  useEffect(() => {
+    if (processedHourly.length > 0 && scrollRef.current) {
+      const width = scrollRef.current.scrollWidth - scrollRef.current.offsetWidth;
+      setDragConstraint(-width - 20);
+    }
+  }, [processedHourly]);
+
+  if (!weather) return <div style={{ background: '#000', height: '100vh', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading...</div>;
+
+  const selectedContent = selectedId ? getDetailContent(selectedId, weather) : null;
+  const weeklyMin = Math.min(...weather.weeklyForecast.map(d => d.minTemp));
+  const weeklyMax = Math.max(...weather.weeklyForecast.map(d => d.maxTemp));
 
   return (
-    // [1] 전체 배경: 대시보드와 통일 (검은색 계열)
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#1a1a2e', // Dashboard와 통일감 있는 색상
-      color: '#eaeaea',
-      padding: '20px'
-    }}>
-      
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}
+      style={{
+        minHeight: '100vh',
+        background: getDynamicBackground(weather.currentSky, isCurrentNight),
+        color: 'white', padding: '20px', fontFamily: '-apple-system, sans-serif',
+        position: 'relative', overflow: 'hidden'
+      }}
+    >
+      {/* 배경 애니메이션 */}
+      {getBackgroundIcon(weather.currentSky, isCurrentNight)}
+
       {/* 헤더 */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
-        <button 
-          onClick={() => navigate(-1)} 
-          style={{ background: 'none', border: 'none', color: '#eaeaea', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '18px' }}
-        >
-          <IoIosArrowBack size={24} /> Back
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', cursor: 'pointer', position: 'relative', zIndex: 10 }} onClick={() => navigate(-1)}>
+        <IoIosArrowBack size={24} /> <span style={{ fontSize: '16px', marginLeft: 5 }}>뒤로가기</span>
       </div>
 
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto', paddingBottom: '40px', position: 'relative', zIndex: 10 }}>
         
-        {/* [2] 현재 날씨 카드 (iOS 스타일 패널) */}
-        <div style={{
-            background: currentStyle.bg,
-            borderRadius: '24px',
-            padding: '30px',
-            textAlign: 'center',
-            boxShadow: '0 10px 20px rgba(0,0,0,0.3)',
-            marginBottom: '30px',
-            color: 'white'
-        }}>
-            <h2 style={{ fontSize: '28px', fontWeight: 'bold', margin: '0 0 10px 0' }}>{weather.location}</h2>
-            <div style={{ marginBottom: '10px' }}>{currentStyle.icon}</div>
-            <div style={{ fontSize: '64px', fontWeight: '300' }}>{Math.round(weather.currentTemp)}°</div>
-            <div style={{ fontSize: '20px', opacity: 0.9 }}>{weather.currentSky}</div>
+        {/* 메인 정보 */}
+        <div style={{ textAlign: 'center', marginTop: '10px', marginBottom: '30px' }}>
+          <h2 style={{ fontSize: '32px', fontWeight: 500, margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>{weather.location}</h2>
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 100 }}
+            style={{ fontSize: '96px', fontWeight: 200, margin: '0' }}
+          >
+            {Math.round(weather.currentTemp)}°
+          </motion.div>
+          <div style={{ fontSize: '20px', fontWeight: 500 }}>{weather.currentSky}</div>
+          <div style={{ fontSize: '18px', fontWeight: 500, marginTop: '5px' }}>
+             최고:{Math.round(weather.weeklyForecast[0]?.maxTemp)}°  최저:{Math.round(weather.weeklyForecast[0]?.minTemp)}°
+          </div>
         </div>
 
-        {/* [3] 주간 예보 (각 요일별 카드 분리) */}
-        <h3 style={{ fontSize: '18px', color: '#aaa', marginBottom: '15px', paddingLeft: '5px' }}>
-            📅 주간 예보 (Weekly)
-        </h3>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {/* 2. 시간대별 예보 */}
+        <div style={containerStyle}>
+          <div style={headerStyle}>🕒 시간대별 예보</div>
+          <motion.div
+            ref={scrollRef} drag="x" dragConstraints={{ right: 0, left: dragConstraint }}
+            style={{ display: 'flex', gap: '25px', cursor: 'grab', paddingBottom: '10px' }}
+          >
+            {processedHourly.map((hour, idx) => (
+              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '55px' }}>
+                <span style={{ fontSize: '14px', marginBottom: '8px', fontWeight: 500 }}>
+                    {hour.type === 'special' ? hour.sky : (idx === 0 ? '지금' : hour.time)}
+                </span>
+                <div style={{ marginBottom: '8px' }}>
+                    {getIcon(hour.sky, 30, hour.isNight)}
+                </div>
+                <span style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                    {hour.type === 'special' ? hour.time : `${Math.round(hour.temp)}°`}
+                </span>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+
+        {/* 3. 주간 예보 */}
+        <div style={containerStyle}>
+          <div style={headerStyle}>📅 7일간의 예보</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {weather.weeklyForecast.map((day, idx) => {
-                // [중요] 각 날씨에 맞는 스타일 개별 적용
-                const dayStyle = getWeatherStyle(day.sky); 
-                
-                return (
-                    <div key={idx} style={{ 
-                        background: dayStyle.bg, // 각 카드의 배경색이 다름
-                        borderRadius: '16px',
-                        padding: '15px 25px',
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
-                        color: 'white'
-                    }}>
-                        {/* 요일 */}
-                        <div style={{ width: '100px', fontWeight: 'bold', fontSize: '16px' }}>
-                            {new Date(day.date).toLocaleDateString('ko-KR', { weekday: 'long' })}
-                        </div>
+              const date = new Date(day.date);
+              const dayName = idx === 0 ? '오늘' : date.toLocaleDateString('ko-KR', { weekday: 'short' });
+              const totalRange = weeklyMax - weeklyMin;
+              const leftPos = ((day.minTemp - weeklyMin) / totalRange) * 100;
+              const widthLen = ((day.maxTemp - day.minTemp) / totalRange) * 100;
 
-                        {/* 아이콘 */}
-                        <div style={{ flex: 1, textAlign: 'center' }}>
-                            {dayStyle.smallIcon}
-                        </div>
-
-                        {/* 온도 */}
-                        <div style={{ width: '60px', textAlign: 'right', fontWeight: 'bold', fontSize: '20px' }}>
-                            {Math.round(day.temp)}°
-                        </div>
+              return (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', fontSize: '16px', height: '35px' }}>
+                  <div style={{ width: '50px', fontWeight: 600 }}>{dayName}</div>
+                  <div style={{ width: '40px', textAlign: 'center' }}>{getIcon(day.sky, 24, false)}</div>
+                  <div style={{ width: '40px', fontSize: '12px', color: '#73d2de', fontWeight: 'bold', textAlign: 'left' }}>
+                    {day.rainChance > 0 ? `${day.rainChance}%` : ''}
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ opacity: 0.8, width: '30px', textAlign: 'right', fontWeight: 500 }}>{Math.round(day.minTemp)}°</span>
+                    <div style={{ flex: 1, height: '4px', background: 'rgba(0,0,0,0.2)', borderRadius: '2px', position: 'relative' }}>
+                      <div style={{
+                        position: 'absolute', left: `${leftPos}%`, width: `${widthLen}%`, height: '100%',
+                        background: 'linear-gradient(90deg, #89f7fe 0%, #66a6ff 100%)', borderRadius: '2px', minWidth: '5px'
+                      }}></div>
                     </div>
-                );
+                    <span style={{ fontWeight: 600, width: '30px', textAlign: 'left' }}>{Math.round(day.maxTemp)}°</span>
+                  </div>
+                </div>
+              );
             })}
+          </div>
+        </div>
+
+        {/* 4. 상세 그리드 & 팝업 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <DetailBox id="uv" title="자외선 지수" icon={<IoSunny />} value={weather.uvIndex} desc={weather.uvIndex > 5 ? "높음" : "낮음"} onClick={setSelectedId} />
+          <DetailBox id="sunset" title="일몰" icon={<IoTime />} value={weather.sunset} desc={`일출: ${weather.sunrise}`} onClick={setSelectedId} />
+          <DetailBox id="wind" title="바람" icon={<IoSpeedometer />} value={`${weather.windSpeed}`} unit="m/s" desc="바람이 다소 붑니다" onClick={setSelectedId} />
+          <DetailBox id="rain" title="강수확률" icon={<IoUmbrella />} value={`${weather.rainChance}`} unit="%" desc="오늘 예상 확률" onClick={setSelectedId} />
+          <DetailBox id="feels" title="체감 온도" icon={<IoThermometer />} value={`${Math.round(weather.feelsLike)}`} unit="°" desc="실제와 비슷" onClick={setSelectedId} />
+          <DetailBox id="humid" title="습도" icon={<IoWater />} value={`${weather.humidity}`} unit="%" desc={`이슬점: ${Math.round(weather.currentTemp - (100 - weather.humidity) / 5)}°`} onClick={setSelectedId} />
+          <DetailBox id="pressure" title="기압" icon={<IoSpeedometer />} value={`${Math.round(weather.pressure)}`} unit="hPa" desc="안정적" onClick={setSelectedId} />
+          <DetailBox id="visibility" title="가시거리" icon={<WiCloudy />} value="24" unit="km" desc="매우 좋음" onClick={setSelectedId} />
         </div>
       </div>
-    </div>
+
+      <AnimatePresence>
+        {selectedId && selectedContent && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedId(null)}
+              style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 99 }}
+            />
+            <motion.div
+              layoutId={selectedId}
+              style={{
+                position: 'fixed', top: '50%', left: '50%', x: '-50%', y: '-50%',
+                width: '300px', height: '300px', background: 'rgba(30, 30, 40, 0.95)', backdropFilter: 'blur(30px)',
+                borderRadius: '24px', padding: '25px', zIndex: 100, color: 'white',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)'
+              }}
+            >
+              <div onClick={() => setSelectedId(null)} style={{ position: 'absolute', top: 20, right: 20, cursor: 'pointer' }}>
+                <IoMdClose size={28} />
+              </div>
+              <div style={{ fontSize: '16px', opacity: 0.8, marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {selectedContent.icon} {selectedContent.title}
+              </div>
+              <div style={{ fontSize: '56px', fontWeight: 'bold', marginBottom: '20px' }}>
+                {selectedContent.val} <span style={{ fontSize: '30px', opacity: 0.6 }}>{selectedContent.unit}</span>
+              </div>
+              <div style={{ textAlign: 'center', lineHeight: '1.6', fontSize: '16px', opacity: 0.9 }}>
+                {selectedContent.desc}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

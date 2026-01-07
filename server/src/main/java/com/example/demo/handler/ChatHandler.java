@@ -8,6 +8,9 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.time.LocalDateTime; // 시간 처리를 위해
+import java.time.format.DateTimeFormatter; // 포맷팅을 위해
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,14 +39,29 @@ public class ChatHandler extends TextWebSocketHandler {
         // [핵심] 클라이언트가 보낸 메시지(JSON string)를 그대로 받아서
         String payload = message.getPayload();
         
-        // DB에 저장 (JSON 문자열을 파싱해서 저장)
+        // 1. 들어온 메시지 파싱
         Map<String, String> msgData = objectMapper.readValue(payload, Map.class);
-        chatMapper.saveMessage(msgData.get("sender"), msgData.get("text"));
+        String sender = msgData.get("sender");
+        String text = msgData.get("text");
 
-        // 접속해 있는 모든 사람(나 포함)에게 다시 쏴준다!
+        // 2. DB에 저장
+        chatMapper.saveMessage(sender, text);
+
+        // 3. 전송할 데이터 구성 (보낸 사람, 내용 + "시간")
+        // 텔레그램처럼 "오후 3:15" 형식으로 만듭니다.
+        String nowTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("a h:mm"));
+
+        Map<String, Object> broadcastMap = new HashMap<>();
+        broadcastMap.put("sender", sender);
+        broadcastMap.put("text", text);
+        broadcastMap.put("createdAt", nowTime); // 시간 추가
+
+        String jsonPayload = objectMapper.writeValueAsString(broadcastMap);
+
+        // 4. 접속해 있는 모든 사람(나 포함)에게 다시 쏴준다!
         for (WebSocketSession s : chatSessions) {
             if (s.isOpen()) {
-                s.sendMessage(new TextMessage(payload));
+                s.sendMessage(new TextMessage(jsonPayload));
             }
         }
     }
