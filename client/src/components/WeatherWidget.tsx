@@ -4,12 +4,13 @@ import { motion } from 'framer-motion';
 import { useUserLocation } from '../contexts/UserLocationContext'; // [변경] 전역 위치 사용
 import { useWeather } from '../hooks/useWeather';
 import { useWeatherFormatter } from '../hooks/useWeatherFormatter'; // [변경] 포매터 사용
+import { getDynamicBackground } from '../utils/WeatherUtils';
 import WeatherBackground from './WeatherBackground';
 import WeatherIcon from './WeatherIcon';
 
 export default function WeatherWidget() {
   const navigate = useNavigate();
-  // [핵심] 훅 한 줄로 데이터 로딩 끝!
+  // 반응형 처리용 ref 및 상태
   const containerRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(6);
 
@@ -41,7 +42,6 @@ export default function WeatherWidget() {
   if (locLoading || weatherLoading) {
     return <div style={{ padding: '20px', color: '#fff' }}>날씨 로딩 중...</div>;
   }
-
   // 2. 위치 정보를 못 가져왔을 때 (예: GPS 차단)
   if (locError || !lat || !lon) {
     return (
@@ -51,7 +51,6 @@ export default function WeatherWidget() {
       </div>
     );
   }
-
   // 3. 서버 통신 실패했을 때 (예: 백엔드 꺼짐)
   if (weatherError) {
     return (
@@ -61,7 +60,6 @@ export default function WeatherWidget() {
       </div>
     );
   }
-
   // 4. 로딩도 끝났고 에러도 없는데 데이터가 비어있을 때 (예외 상황)
   if (!weather) {
      return <div style={{ padding: '20px', color: '#fff' }}>날씨 정보가 없습니다.</div>;
@@ -78,7 +76,8 @@ export default function WeatherWidget() {
         boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
         cursor: 'pointer', fontFamily: '-apple-system, sans-serif',
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        isolation: 'isolate'
       }}
     >
       {/* 1. 배경 컴포넌트 (깔끔!) */}
@@ -92,9 +91,7 @@ export default function WeatherWidget() {
       {/* 2. 배경 그라데이션 (배경 컴포넌트 뒤에 깔거나, 부모 div 스타일로 처리 가능하지만 여기선 오버레이 방식 사용) */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1,
-        // utils에서 가져온 함수 사용 (import 필요: getDynamicBackground)
-        // 편의상 인라인으로 처리하거나 WeatherBackground에 통합해도 됨.
-        // 여기서는 기존 스타일 유지를 위해 WeatherBackground 내부가 아닌 부모 div style에 넣는 게 좋음 (위 코드 style 참조)
+        background: getDynamicBackground(weather.currentSky, isCurrentNight)
       }} />
 
       {/* 상단 정보 */}

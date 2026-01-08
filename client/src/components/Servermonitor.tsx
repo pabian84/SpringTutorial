@@ -57,6 +57,12 @@ export default function ServerMonitor() {
 
     // 4. 화면이 꺼질 때 연결 끊기 (필수)
     return () => {
+      // 소켓을 닫기 전에 모든 이벤트 핸들러를 제거합니다.
+      // 이렇게 하면 닫히는 도중 발생하는 에러(readyState 3 등)가 무시됩니다.
+      ws.onopen = null;
+      ws.onmessage = null;
+      ws.onerror = null;
+      ws.onclose = null;
       ws.close();
     };
   }, []);
