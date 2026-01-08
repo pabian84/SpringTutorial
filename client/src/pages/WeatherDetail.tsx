@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { IoIosArrowBack, IoMdClose } from 'react-icons/io';
 import { IoWater, IoSpeedometer, IoThermometer, IoUmbrella, IoTime, IoSunny, IoMoon } from 'react-icons/io5';
 import { 
-  WiDaySunny, WiCloudy, WiRain, WiSnow, WiDayCloudy, WiFog, 
-  WiNightClear, WiNightAltCloudy, WiNightAltRain, WiNightAltSnow, WiNightAltShowers, WiNightAltThunderstorm,
+  WiCloudy, WiRain, WiSnow, WiDayCloudy, WiFog, 
+  WiNightAltCloudy, WiNightFog, WiNightAltRain, WiNightAltSnow, WiNightAltShowers, WiNightAltThunderstorm,
   WiSunrise, WiSunset, WiThunderstorm, WiShowers 
 } from 'react-icons/wi';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -51,6 +51,16 @@ interface DetailBoxProps {
   unit?: string;
   desc: string;
   onClick: (id: string) => void;
+}
+
+// 날씨 타입 정의 (애니메이션 그룹핑용)
+type WeatherType = 'sun' | 'moon' | 'cloud' | 'rain' | 'snow' | 'fog' | 'storm' | 'sunrise' | 'sunset';
+
+// 분석 결과 인터페이스
+interface WeatherAsset {
+  type: WeatherType;
+  Icon: React.ElementType;
+  color?: string;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -109,124 +119,223 @@ const DetailBox = ({ id, title, icon, value, unit = "", desc, onClick }: DetailB
   </motion.div>
 );
 
-const getDynamicBackground = (sky: string, isNight: boolean) => {
-  if (isNight) {
-    if (sky.includes('비') || sky.includes('소나기')) return 'linear-gradient(180deg, #000000 0%, #434343 100%)';
-    if (sky.includes('눈')) return 'linear-gradient(180deg, #232526 0%, #414345 100%)';
-    if (sky.includes('흐림') || sky.includes('구름')) return 'linear-gradient(180deg, #2c3e50 0%, #3498db 100%)';
-    return 'linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%)';
-  }
+// 날씨 상태 분석 공통 함수
+const getWeatherAsset = (sky: string, isNight: boolean): WeatherAsset => {
+  // 특수 케이스
+  if (sky === '일출') return { type: 'sunrise', Icon: WiSunrise, color: '#FFD700' };
+  if (sky === '일몰') return { type: 'sunset', Icon: WiSunset, color: '#FFA500' };
 
-  if (sky.includes('맑음')) return 'linear-gradient(180deg, #5CA0F2 0%, #87CEFA 100%)';
-  if (sky.includes('비') || sky.includes('소나기')) return 'linear-gradient(180deg, #374151 0%, #111827 100%)';
-  if (sky.includes('흐림') || sky.includes('구름')) return 'linear-gradient(180deg, #6b7280 0%, #374151 100%)';
-  if (sky.includes('눈')) return 'linear-gradient(180deg, #9ca3af 0%, #4b5563 100%)';
-  if (sky.includes('폭풍우')) return 'linear-gradient(180deg, #1f2937 0%, #000000 100%)';
-  return 'linear-gradient(180deg, #5CA0F2 0%, #87CEFA 100%)';
+  // 밤
+  if (isNight) {
+    if (sky.includes('구름조금')) return { type: 'cloud', Icon: WiNightAltCloudy };
+    if (sky.includes('흐림') || sky.includes('구름')) return { type: 'cloud', Icon: WiCloudy };
+    if (sky.includes('비')) return { type: 'rain', Icon: WiNightAltRain };
+    if (sky.includes('소나기')) return { type: 'rain', Icon: WiNightAltShowers };
+    if (sky.includes('눈')) return { type: 'snow', Icon: WiNightAltSnow };
+    if (sky.includes('안개')) return { type: 'fog', Icon: WiNightFog };
+    if (sky.includes('폭풍우')) return { type: 'storm', Icon: WiNightAltThunderstorm };
+    // 기본 맑은 밤 -> 달(IoMoon)
+    return { type: 'moon', Icon: IoMoon }; // 기본값
+  } 
+  
+  // 낮
+  if (sky.includes('구름조금')) return { type: 'cloud', Icon: WiDayCloudy };
+  if (sky.includes('흐림') || sky.includes('구름')) return { type: 'cloud', Icon: WiCloudy };
+  if (sky.includes('비')) return { type: 'rain', Icon: WiRain };
+  if (sky.includes('소나기')) return { type: 'rain', Icon: WiShowers };
+  if (sky.includes('눈')) return { type: 'snow', Icon: WiSnow };
+  if (sky.includes('안개')) return { type: 'fog', Icon: WiFog };
+  if (sky.includes('폭풍우')) return { type: 'storm', Icon: WiThunderstorm };
+  // 기본 맑은 날 -> 태양(IoSunny)
+  return { type: 'sun', Icon: IoSunny }; // 기본값
+};
+
+// 배경 그라데이션 함수
+const getDynamicBackground = (sky: string, isNight: boolean) => {
+  // 1. 공통 분석 로직 사용 (중복 if문 제거)
+  const { type } = getWeatherAsset(sky, isNight);
+
+  // 2. 타입별 배경색 매핑
+  switch (type) {
+    case 'sunrise':
+      // 일출: 새벽의 푸른빛에서 아침의 붉은빛으로
+      return 'linear-gradient(180deg, #667db6 0%, #0082c8 0%, #0082c8 0%, #0082c8 0%, #fc4a1a 0%, #f7b733 100%)';
+    
+    case 'sunset':
+      // 일몰: 보랏빛과 주황빛의 조화
+      return 'linear-gradient(180deg, #355C7D 0%, #6C5B7B 50%, #C06C84 100%)';
+
+    case 'sun': // 맑은 낮
+      return 'linear-gradient(180deg, #5CA0F2 0%, #87CEFA 100%)';
+
+    case 'moon': // 맑은 밤
+      return 'linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%)';
+
+    case 'cloud':
+      // 구름: 밤에는 짙은 회색, 낮에는 흐린 하늘색
+      return isNight 
+        ? 'linear-gradient(180deg, #2c3e50 0%, #3498db 100%)' 
+        : 'linear-gradient(180deg, #6b7280 0%, #374151 100%)';
+
+    case 'rain':
+      // 비: 밤에는 아주 어두움, 낮에는 짙은 먹구름
+      return isNight
+        ? 'linear-gradient(180deg, #000000 0%, #434343 100%)'
+        : 'linear-gradient(180deg, #373B44 0%, #4286f4 100%)';
+
+    case 'snow':
+      // 눈: 차가운 느낌
+      return isNight
+        ? 'linear-gradient(180deg, #232526 0%, #414345 100%)'
+        : 'linear-gradient(180deg, #83a4d4 0%, #b6fbff 100%)';
+
+    case 'fog':
+      // 안개: 몽환적인 회색 톤
+      return isNight
+        ? 'linear-gradient(180deg, #1e130c 0%, #9a8478 100%)'
+        : 'linear-gradient(180deg, #bdc3c7 0%, #2c3e50 100%)';
+
+    case 'storm':
+      // 폭풍우: 매우 어둡고 강렬함
+      return 'linear-gradient(180deg, #141E30 0%, #243B55 100%)';
+
+    default:
+      // 기본값
+      return isNight
+        ? 'linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%)'
+        : 'linear-gradient(180deg, #5CA0F2 0%, #87CEFA 100%)';
+  }
 };
 
 const getIcon = (sky: string, size: number, isNight: boolean = false) => {
-  const props = { size, color: "#fff" };
-  
-  // [수정] 일출: 아래에서 위로 둥둥 떠오르는 효과 + 밝기 조절
-  if (sky === '일출') {
-    return (
-      <motion.div 
-        animate={{ y: [3, -3, 3], opacity: [0.7, 1, 0.7] }} 
-        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-      >
-        <WiSunrise {...props} color="#FFD700" />
-      </motion.div>
-    );
-  }
+  // 공통 로직 사용
+  const { type, Icon, color } = getWeatherAsset(sky, isNight);
+  const props = { size, color: color || "#fff" };
 
-  // [수정] 일몰: 위에서 아래로 가라앉는 효과 + 밝기 조절
-  if (sky === '일몰') {
-    return (
-      <motion.div 
-        animate={{ y: [-3, 3, -3], opacity: [1, 0.7, 1] }} 
-        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-      >
-        <WiSunset {...props} color="#FFA500" />
-      </motion.div>
-    );
+  switch (type) {
+    case 'sunrise':
+      return <motion.div animate={{ y: [3, -3, 3], opacity: [0.7, 1, 0.7] }} transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}><Icon {...props} /></motion.div>;
+    case 'sunset':
+      return <motion.div animate={{ y: [-3, 3, -3], opacity: [1, 0.7, 1] }} transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}><Icon {...props} /></motion.div>;
+    case 'sun':
+      return <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 12, ease: "linear" }}><Icon {...props} /></motion.div>;
+    case 'moon':
+      return <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}><Icon {...props} /></motion.div>;
+    case 'cloud':
+      return <motion.div animate={{ y: [0, -3, 0], scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}><Icon {...props} /></motion.div>;
+    case 'rain':
+      return <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 1.2 }}><Icon {...props} /></motion.div>;
+    case 'snow':
+      return <motion.div animate={{ rotate: [0, 10, -10, 0], y: [0, 3, 0] }} transition={{ repeat: Infinity, duration: 3 }}><Icon {...props} /></motion.div>;
+    case 'fog':
+      return <motion.div animate={{ opacity: [0.5, 0.8, 0.5] }} transition={{ repeat: Infinity, duration: 4 }}><Icon {...props} /></motion.div>;
+    case 'storm':
+      return <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 0.5 }}><Icon {...props} /></motion.div>;
+    default:
+      return <Icon {...props} />;
   }
-
-  // 밤 아이콘
-  if (isNight) {
-    if (sky.includes('구름조금')) {
-       return <motion.div animate={{ x: [-2, 2, -2] }} transition={{ repeat: Infinity, duration: 4 }}><WiNightAltCloudy {...props} /></motion.div>;
-    }
-    if (sky.includes('비')) {
-       return <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 1.2 }}><WiNightAltRain {...props} /></motion.div>;
-    }
-    if (sky.includes('소나기')) {
-       return <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 0.8 }}><WiNightAltShowers {...props} /></motion.div>;
-    }
-    if (sky.includes('눈')) {
-       return <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity, duration: 3 }}><WiNightAltSnow {...props} /></motion.div>;
-    }
-    if (sky.includes('폭풍우')) {
-       return <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 0.5 }}><WiNightAltThunderstorm {...props} /></motion.div>;
-    }
-    if (sky.includes('흐림') || sky.includes('구름')) {
-       return <motion.div animate={{ x: [-3, 3, -3] }} transition={{ repeat: Infinity, duration: 5 }}><WiCloudy {...props} /></motion.div>;
-    }
-    // 기본 맑은 밤
-    return <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}><WiNightClear {...props} /></motion.div>;
-  }
-
-  // 낮 아이콘
-  if (sky.includes('맑음')) {
-    return <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 12, ease: "linear" }}><WiDaySunny {...props} /></motion.div>;
-  }
-  if (sky.includes('구름조금')) {
-    return <motion.div animate={{ y: [0, -3, 0], scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}><WiDayCloudy {...props} /></motion.div>;
-  }
-  if (sky.includes('흐림') || sky.includes('구름')) {
-    return <motion.div animate={{ x: [-3, 3, -3] }} transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}><WiCloudy {...props} /></motion.div>;
-  }
-  if (sky.includes('소나기')) {
-    return <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 0.8 }}><WiShowers {...props} /></motion.div>;
-  }
-  if (sky.includes('비')) {
-    return <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 1.2 }}><WiRain {...props} /></motion.div>;
-  }
-  if (sky.includes('눈')) {
-    return <motion.div animate={{ rotate: [0, 10, -10, 0], y: [0, 3, 0] }} transition={{ repeat: Infinity, duration: 3 }}><WiSnow {...props} /></motion.div>;
-  }
-  if (sky.includes('안개')) {
-     return <motion.div animate={{ opacity: [0.5, 0.8, 0.5] }} transition={{ repeat: Infinity, duration: 4 }}><WiFog {...props} /></motion.div>;
-  }
-  if (sky.includes('폭풍우')) {
-    return <motion.div animate={{ opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 0.5 }}><WiThunderstorm {...props} /></motion.div>;
-  }
-  
-  return <motion.div animate={{ y: [0, -3, 0], scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}><WiDayCloudy {...props} /></motion.div>;
 };
 
-const getBackgroundIcon = (sky: string, isNight: boolean) => {
-  const style: React.CSSProperties = {
-    position: 'absolute', top: '2%', right: '-10px',
-    opacity: 0.1, zIndex: 0
+// 시간 흐름에 따른 태양/달 위치 계산 함수
+const calculateCelestialPosition = (sunrise: string, sunset: string) => {
+  // 기본값 (데이터 없을 때 우측 상단)
+  if (!sunrise || !sunset) return { top: '2%', left: '70%' };
+
+  // --- [설정] 여기서 위치 범위를 마음대로 수정하세요 ---
+  const xStart = 20;  // 시작 위치 (왼쪽 %) -> 20%
+  const xEnd = 80;    // 끝 위치 (오른쪽 %) -> 80%
+  const yLow = 10;    // 가장 낮을 때 높이 (일출/일몰 시점) (%) -> 60%
+  const yHigh = 2;    // 가장 높을 때 높이 (한낮/자정) (%) -> 5%
+  // ---------------------------------------------------
+
+  const now = new Date();
+  const currentM = now.getHours() * 60 + now.getMinutes();
+  const sunriseM = getMinutes(sunrise);
+  const sunsetM = getMinutes(sunset);
+
+  let progress = 0; // 0.0 ~ 1.0 (0% ~ 100%)
+
+  // 낮 시간대 (일출 ~ 일몰)
+  if (currentM >= sunriseM && currentM < sunsetM) {
+    const totalDay = sunsetM - sunriseM;
+    progress = (currentM - sunriseM) / totalDay;
+  } 
+  // 밤 시간대 (일몰 ~ 다음날 일출)
+  else {
+    const totalDay = 1440; // 24시간
+    let elapsed = 0;
+    let totalNight = 0;
+
+    if (currentM >= sunsetM) {
+      // 자정 전 (예: 23시)
+      elapsed = currentM - sunsetM;
+      totalNight = (totalDay - sunsetM) + sunriseM;
+    } else {
+      // 자정 후 (예: 04시)
+      elapsed = (totalDay - sunsetM) + currentM;
+      totalNight = (totalDay - sunsetM) + sunriseM;
+    }
+    progress = elapsed / totalNight;
+  }
+
+  // 위치 계산 (호 모양 그리기)
+  // 1. X축 계산 (선형 이동: xStart -> xEnd)
+  const leftPos = xStart + (progress * (xEnd - xStart));
+  
+  // 2. Y축 계산 (곡선 이동: 사인파 사용)
+  // Math.sin(0) = 0, Math.sin(0.5 * PI) = 1, Math.sin(PI) = 0
+  // 즉, 시작과 끝은 yLow, 중간(50%)은 yHigh가 됨
+  const heightDiff = yLow - yHigh;
+  const topPos = yLow - (Math.sin(progress * Math.PI) * heightDiff);
+
+  return { top: `${topPos}%`, left: `${leftPos}%` };
+};
+
+// 배경 아이콘 함수 (위에서 만든 함수 사용)
+const getBackgroundIcon = (sky: string, isNight: boolean, sunrise: string, sunset: string) => { // 인자 추가됨
+  // 공통 로직 사용
+  const { type, Icon } = getWeatherAsset(sky, isNight);
+
+  // 동적 위치 계산
+  const pos = calculateCelestialPosition(sunrise, sunset);
+  const size = 300;  
+
+  // 움직이는 아이콘 스타일
+  const celestialStyle: React.CSSProperties = { 
+    position: 'absolute', 
+    top: pos.top, 
+    left: pos.left, 
+    opacity: 0.15, 
+    zIndex: 0,
+    transition: 'top 1s, left 1s' // 위치 바뀔 때 부드럽게
   };
-  const size = 300;
+  // 고정된 아이콘 스타일 (구름, 비 등) - 우측 고정
+  const staticStyle: React.CSSProperties = { 
+    position: 'absolute', top: '10%', right: '-20px', opacity: 0.15, zIndex: 0 
+  };
 
-  if (isNight) {
-      if (sky.includes('비') || sky.includes('소나기')) return <motion.div style={style} animate={{ y: [0, 20, 0] }} transition={{ repeat: Infinity, duration: 2 }}><IoWater size={size} /></motion.div>;
-      return <motion.div style={style} animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 5 }}><IoMoon size={size} /></motion.div>;
+  switch (type) {
+    case 'sun':
+      return <motion.div style={celestialStyle} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 60, ease: "linear" }}><Icon size={size} /></motion.div>;
+    case 'moon':
+      return <motion.div style={celestialStyle} animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 5 }}><Icon size={size} /></motion.div>;
+    
+    // 나머지 날씨는 고정 위치 + 배경 애니메이션
+    case 'cloud':
+      return <motion.div style={staticStyle} animate={{ x: [-10, 10, -10] }} transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}><Icon size={size} /></motion.div>;
+    case 'rain':
+      return <motion.div style={staticStyle} animate={{ y: [0, 20, 0] }} transition={{ repeat: Infinity, duration: 2 }}><Icon size={size} /></motion.div>;
+    case 'snow':
+      return <motion.div style={staticStyle} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 30 }}><Icon size={size} /></motion.div>;
+    case 'fog':
+      return <motion.div style={staticStyle} animate={{ opacity: [0.1, 0.25, 0.1] }} transition={{ repeat: Infinity, duration: 5 }}><Icon size={size} /></motion.div>;
+    case 'storm':
+      return <motion.div style={staticStyle} animate={{ opacity: [0.15, 0.4, 0.15] }} transition={{ repeat: Infinity, duration: 0.5 }}><Icon size={size} /></motion.div>;
+    
+    default:
+       // 기본 해
+       return <motion.div style={celestialStyle} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 60, ease: "linear" }}><IoSunny size={size} /></motion.div>;
   }
-
-  if (sky.includes('맑음')) {
-    return <motion.div style={style} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 60, ease: "linear" }}><IoSunny size={size} /></motion.div>;
-  }
-  if (sky.includes('비') || sky.includes('소나기')) {
-    return <motion.div style={style} animate={{ y: [0, 20, 0] }} transition={{ repeat: Infinity, duration: 2 }}><IoWater size={size} /></motion.div>;
-  }
-  if (sky.includes('눈')) {
-     return <motion.div style={style} animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 30 }}><WiSnow size={size} /></motion.div>;
-  }
-  return <motion.div style={style} animate={{ x: [0, 20, 0] }} transition={{ repeat: Infinity, duration: 10 }}><WiCloudy size={size} /></motion.div>;
 };
 
 const getDetailContent = (id: string, w: WeatherData) => {
@@ -312,7 +421,7 @@ export default function WeatherDetail() {
       }}
     >
       {/* 배경 애니메이션 */}
-      {getBackgroundIcon(weather.currentSky, isCurrentNight)}
+      {getBackgroundIcon(weather.currentSky, isCurrentNight, weather.sunrise, weather.sunset)}
 
       {/* 헤더 */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', cursor: 'pointer', position: 'relative', zIndex: 10 }} onClick={() => navigate(-1)}>

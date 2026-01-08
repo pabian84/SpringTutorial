@@ -1,25 +1,20 @@
 import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+
+import { useQuery } from '@tanstack/react-query'; // 임포트 추가
+import { showAlert } from '../utils/Alert';
+import { BiExpand, BiX } from 'react-icons/bi';
+
 import MapWidget from '../components/MapWidget';
 import ServerMonitor from '../components/Servermonitor';
 import MemoWidget from '../components/MemoWidget';
-import { getWeatherStyle, type DailyForecast } from '../utils/WeatherUtils';
-import { useQuery } from '@tanstack/react-query'; // 임포트 추가
-import { showAlert } from '../utils/Alert';
 import ChatWidget, { type ChatMessage } from '../components/ChatWidget'; 
-import { BiExpand, BiX } from 'react-icons/bi';
+import WeatherWidget from '../components/WeatherWidget';
 
 interface UserData {
   id: string;
   name: string;
-}
-
-interface WeatherData {
-  location: string;
-  currentTemp: number;
-  currentSky: string;
-  weeklyForecast: DailyForecast[]; 
 }
 
 export default function Dashboard() {
@@ -71,17 +66,7 @@ export default function Dashboard() {
     refetchInterval: 5000, // 5초마다 자동 갱신 (실시간 효과)
   });
 
-  // 날씨 정보 (React Query 적용) ---
-  // queryKey에 좌표(lat, lon)를 포함시켜, 위치가 바뀌면 자동으로 데이터를 다시 가져옵니다.
-  const { data: weather } = useQuery({
-    queryKey: ['weather', myLocation.lat, myLocation.lon], 
-    queryFn: async () => {
-      const res = await axios.get(`http://localhost:8080/api/weather?lat=${myLocation.lat}&lon=${myLocation.lon}`);
-      return res.data as WeatherData;
-    }
-  });
-
-  // [신규] 채팅 기록 불러오기 (React Query) -> DB에 저장된 이전 대화 로드
+  // 채팅 기록 불러오기 (React Query) -> DB에 저장된 이전 대화 로드
   useQuery({
     queryKey: ['chatHistory'],
     queryFn: async () => {
@@ -236,41 +221,11 @@ export default function Dashboard() {
       <div style={styles.grid}>
         
         {/* [왼쪽 위] 날씨 위젯 (스타일 적용됨) */}
-        {weather ? (
-          <div
-            onClick={() => navigate('/weather')}
-            style={{ 
-              ...styles.card, 
-              cursor: 'pointer', 
-              // [핵심] 날씨에 따라 배경색 변경
-              background: getWeatherStyle(weather.currentSky).bg,
-              position: 'relative',
-              overflow: 'hidden'
-            }} 
-          >
-            {/* 타이틀: 아이콘도 동적으로 변경 */}
-            <h3 style={styles.sectionTitle}>
-              {/* [수정] 날씨 제목도 정렬 맞춤 */}
-              <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                {getWeatherStyle(weather.currentSky).smallIcon} Local Weather
-              </div>
-            </h3>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <span style={{ fontSize: '48px', fontWeight: 'bold' }}>{Math.round(weather.currentTemp)}°C</span>
-                <div style={{ fontSize: '18px', color: '#fff',opacity: 0.9 }}>{weather.currentSky}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold' }}>{weather.location}</div>
-                {/* [수정] 안내 문구 색상 밝게 조정 */}
-                <small style={{ color: 'rgba(255,255,255,0.7)' }}>클릭하여 주간 예보 확인 &rarr;</small>
-              </div>
-            </div>
-          </div>
-          ) : (
-            <div style={styles.card}>Loading Weather...</div>
-        )}
-
+        {/* WeatherWidget 자체가 카드 형태이므로 별도 card 스타일 없이 바로 배치 */}
+        <div style={{ ...styles.card, padding: 0 }} id="weather-widget-card">
+           <WeatherWidget /> 
+        </div>
+        
         {/* [오른쪽 위] 온라인 접속자 리스트 */}
         <div style={{ ...styles.card, gridRow: 'span 2' }}> {/* 세로로 길게 쓰기 */}
           <h3 style={styles.sectionTitle}>🟢 Online Users ({onlineUsers.length})</h3>

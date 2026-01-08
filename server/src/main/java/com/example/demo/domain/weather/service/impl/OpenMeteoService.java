@@ -22,50 +22,50 @@ public class OpenMeteoService implements WeatherProvider {
     public WeatherRes getWeather(double lat, double lon) {
         // 1. 날씨 데이터 가져오기 (Open-Meteo)
         String url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat
-                    + "&longitude=" + lon
-                    + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,surface_pressure"
-                    + "&hourly=temperature_2m,weather_code,precipitation_probability"
-                    + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max"
-                    + "&timezone=auto&forecast_days=7";
-        
+                + "&longitude=" + lon
+                + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,surface_pressure"
+                + "&hourly=temperature_2m,weather_code,precipitation_probability"
+                + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max"
+                + "&timezone=auto&forecast_days=7";
+
         RestTemplate restTemplate = new RestTemplate();
         Map<String, Object> response = restTemplate.getForObject(url, Map.class);
-        
+
         // 데이터 파싱 (복잡한 로직은 Service에 숨김)
         WeatherRes res = new WeatherRes();
         // 2. 좌표를 한글 주소로 변환 (Reverse Geocoding - Nominatim)
         try {
             // zoom=10: 시/군/구 레벨, accept-language=ko: 한글 반환
-            String geoUrl = "https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat 
-                            + "&lon=" + lon + "&zoom=10&addressdetails=1&accept-language=ko";
-            
+            String geoUrl = "https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat
+                    + "&lon=" + lon + "&zoom=10&addressdetails=1&accept-language=ko";
+
             // Nominatim은 User-Agent 헤더가 필수입니다.
             HttpHeaders headers = new HttpHeaders();
             headers.add("User-Agent", "SpringTutorialApp/1.0"); // 앱 이름 임의 지정
             HttpEntity<String> entity = new HttpEntity<>(headers);
-            
+
             ResponseEntity<Map> geoResponse = restTemplate.exchange(geoUrl, HttpMethod.GET, entity, Map.class);
             Map<String, Object> addressMap = (Map<String, Object>) geoResponse.getBody().get("address");
-            
+
             if (addressMap != null) {
                 // 시, 도, 구 중 존재하는 값 조합
                 String city = (String) addressMap.getOrDefault("city", "");
                 String province = (String) addressMap.getOrDefault("province", "");
                 String town = (String) addressMap.getOrDefault("town", "");
                 String borough = (String) addressMap.getOrDefault("borough", "");
-                
+
                 String locationName = "";
-                if (!province.isEmpty()) { 
-                    locationName += province + " "; 
+                if (!province.isEmpty()) {
+                    locationName += province + " ";
                 }
-                if (!city.isEmpty()) { 
-                    locationName += city; 
-                } else if (!town.isEmpty()) { 
-                    locationName += town; 
+                if (!city.isEmpty()) {
+                    locationName += city;
+                } else if (!town.isEmpty()) {
+                    locationName += town;
                 } else if (!borough.isEmpty()) {
                     locationName += borough;
                 }
-                
+
                 res.setLocation(locationName.trim());
             } else {
                 res.setLocation("알 수 없는 지역");
@@ -80,13 +80,37 @@ public class OpenMeteoService implements WeatherProvider {
         Map<String, Object> current = (Map<String, Object>) response.get("current");
         Map<String, Object> daily = (Map<String, Object>) response.get("daily");
 
+        // 일출/일몰 정보를 먼저 가져와야 현재 상태 판단 가능
+        String todaySunrise = null;
+        String todaySunset = null;
+        if (daily != null) {
+            List<String> sunrises = (List<String>) daily.get("sunrise");
+            List<String> sunsets = (List<String>) daily.get("sunset");
+
+            // 오늘 날짜(0번 인덱스)의 일출/일몰 시간 가져오기 (ISO 포맷: 2024-01-08T07:12)
+            if (sunrises != null && !sunrises.isEmpty())
+                todaySunrise = sunrises.get(0);
+            if (sunsets != null && !sunsets.isEmpty())
+                todaySunset = sunsets.get(0);
+        }
+        // 현재 날씨 상세정보 설정
         if (current != null) {
             res.setCurrentTemp(Double.parseDouble(current.get("temperature_2m").toString()));
             res.setFeelsLike(Double.parseDouble(current.get("apparent_temperature").toString()));
             res.setHumidity(Double.parseDouble(current.get("relative_humidity_2m").toString()));
             res.setWindSpeed(Double.parseDouble(current.get("wind_speed_10m").toString()));
             res.setPressure(Double.parseDouble(current.get("surface_pressure").toString())); // 기압
-            res.setCurrentSky(convertCode(Integer.parseInt(current.get("weather_code").toString())));
+            // WMO 코드 -> 한글 상태 변환
+            String skyStatus = convertCode(Integer.parseInt(current.get("weather_code").toString()));
+            // 일출/일몰 구간인지 체크하여 상태 덮어쓰기
+            if (todaySunrise != null && todaySunset != null) {
+                // Timezone 정보 가져오기 (없으면 UTC)
+                String timezoneStr = (String) response.get("timezone");
+                if (timezoneStr == null)
+                    timezoneStr = "UTC";
+                skyStatus = determineSkyStatus(skyStatus, todaySunrise, todaySunset, timezoneStr);
+            }
+            res.setCurrentSky(skyStatus);
         }
 
         // [일출/일몰] 데이터 추출을 위한 리스트 초기화
@@ -153,7 +177,7 @@ public class OpenMeteoService implements WeatherProvider {
                     combinedList.add(item);
                 }
             }
-            
+
             // (3) 일몰 데이터 리스트에 끼워넣기
             if (sunsets != null) {
                 for (String s : sunsets) {
@@ -175,7 +199,7 @@ public class OpenMeteoService implements WeatherProvider {
             combinedList.sort((o1, o2) -> {
                 String t1 = (String) o1.get("fullTime");
                 String t2 = (String) o2.get("fullTime");
-                
+
                 // 둘 다 null이면 동등
                 if (t1 == null && t2 == null) {
                     return 0;
@@ -193,7 +217,7 @@ public class OpenMeteoService implements WeatherProvider {
 
             // (5) "현재 위치의 시간"을 기준으로 필터링
             // API가 반환한 timezone 정보를 활용 (예: America/New_York)
-            String timezoneStr = (String) response.get("timezone"); 
+            String timezoneStr = (String) response.get("timezone");
             if (timezoneStr == null) {
                 timezoneStr = "UTC"; // 값이 없으면 기본 UTC
             }
@@ -202,16 +226,16 @@ public class OpenMeteoService implements WeatherProvider {
             String nowStr = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"));
 
             List<Map<String, Object>> finalHourlyList = new ArrayList<>();
-            
+
             // 정렬된 리스트를 순회하며 현재 시간 이후의 데이터만 추출
             for (Map<String, Object> item : combinedList) {
                 String itemTime = (String) item.get("fullTime");
-                
+
                 // itemTime이 현재 시간(nowStr)보다 미래거나 같으면 추가
                 if (itemTime != null && itemTime.compareTo(nowStr) >= 0) {
                     finalHourlyList.add(item);
                 }
-                
+
                 // 프론트엔드 성능을 위해 너무 많은 데이터는 자름 (26개 정도면 24시간+@ 커버)
                 if (finalHourlyList.size() >= 26) {
                     break;
@@ -230,14 +254,14 @@ public class OpenMeteoService implements WeatherProvider {
             List<Integer> rainProbs = (List<Integer>) daily.get("precipitation_probability_max"); // 강수확률 추가
 
             // 최대 7일치 데이터 반복
-            for(int i=0; i<Math.min(7, times.size()); i++) {
+            for (int i = 0; i < Math.min(7, times.size()); i++) {
                 Map<String, Object> day = new HashMap<>();
                 day.put("date", times.get(i));
                 day.put("maxTemp", maxTemps.get(i));
                 day.put("minTemp", minTemps.get(i));
                 day.put("sky", convertCode(codes.get(i)));
                 if (rainProbs != null) {
-                     day.put("rainChance", rainProbs.get(i)); // 비 올 확률
+                    day.put("rainChance", rainProbs.get(i)); // 비 올 확률
                 }
                 weekly.add(day);
             }
@@ -270,5 +294,44 @@ public class OpenMeteoService implements WeatherProvider {
             return "눈";
         }
         return "폭풍우";
+    }
+
+    // 일출/일몰 상태 결정 로직 (앞뒤 15분)
+    private String determineSkyStatus(String originalSky, String sunriseIso, String sunsetIso, String timezone) {
+        try {
+            // API가 주는 일출/일몰 시간은 해당 지역 Timezone 기준의 ISO 포맷임
+            // 현재 서버 시간도 해당 지역 Timezone에 맞춰서 비교해야 함
+            ZoneId zoneId = ZoneId.of(timezone);
+            LocalDateTime now = LocalDateTime.now(zoneId);
+
+            LocalDateTime sunrise = LocalDateTime.parse(sunriseIso, DateTimeFormatter.ISO_DATE_TIME);
+            LocalDateTime sunset = LocalDateTime.parse(sunsetIso, DateTimeFormatter.ISO_DATE_TIME);
+
+            // 1. 일출 구간 (앞뒤 15분)
+            if (isWithinRange(now, sunrise, 15)) {
+                return "일출";
+            }
+
+            // 2. 일몰 구간 (앞뒤 15분)
+            if (isWithinRange(now, sunset, 15)) {
+                return "일몰";
+            }
+
+        } catch (Exception e) {
+            // 파싱 에러 시 원래 날씨 반환
+            return originalSky;
+        }
+
+        return originalSky;
+    }
+
+    // 시간 범위 체크 헬퍼
+    private boolean isWithinRange(LocalDateTime now, LocalDateTime target, int minutes) {
+        LocalDateTime start = target.minusMinutes(minutes);
+        LocalDateTime end = target.plusMinutes(minutes);
+        // now가 start보다 뒤이고(end 포함하지 않음), end보다 앞이어야 함
+        // isAfter/isBefore는 경계값을 포함하지 않으므로 정확하게는 >=, <= 처리가 필요할 수 있으나
+        // 1분 단위 비교에서는 큰 문제 없음.
+        return now.isAfter(start) && now.isBefore(end);
     }
 }
