@@ -2,8 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
+import { useUserLocation } from '../contexts/UserLocationContext';
+
 import { useQuery } from '@tanstack/react-query'; // 임포트 추가
-import { showAlert } from '../utils/Alert';
 import { BiExpand, BiX } from 'react-icons/bi';
 
 import MapWidget from '../components/MapWidget';
@@ -20,11 +21,9 @@ interface UserData {
 export default function Dashboard() {
   const navigate = useNavigate();
   const myId = localStorage.getItem('myId') || sessionStorage.getItem('myId');
-  // 내 위치 상태 관리, 추적 (기본값: 용인시청)
-  const [myLocation, setMyLocation] = useState<{lat: number, lon: number}>({
-    lat: 37.241086,
-    lon: 127.177553
-  });
+  // [수정] useState로 관리하던 위치 정보 삭제 -> 전역 Context 사용
+  // 이제 Dashboard가 위치를 직접 찾지 않고, Context가 찾은 값을 받아오기만 합니다.
+  const { lat, lon, loading: locLoading } = useUserLocation();
   const [isChatExpanded, setIsChatExpanded] = useState(false);
 
   // [1] 채팅 상태를 Dashboard에서 관리 (Lifting State Up)
@@ -35,24 +34,6 @@ export default function Dashboard() {
     if (!myId) {
       navigate('/');
       return;
-    }
-
-    // 브라우저를 통해 위치 정보 가져오기 -> 성공하면 위치 정보 업데이트
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                // 내 위치 상태 업데이트 (지도 이동용)
-                setMyLocation({ lat: latitude, lon: longitude });
-            },
-            (err) => {
-                showAlert('위치 정보 오류', '위치 정보를 가져오지 못했습니다. 기본 위치로 설정됩니다.', 'warning');
-                console.error("위치 권한 차단됨:", err);
-            }
-        );
-    } else {
-        // 브라우저가 위치 기능을 지원 안 할 때
-        showAlert('지원 불가', '이 브라우저는 위치 정보를 지원하지 않습니다.', 'error');
     }
   }, [myId, navigate]);
 
@@ -253,7 +234,14 @@ export default function Dashboard() {
           <h3 style={styles.sectionTitle}>🗺 City Map</h3>
           {/* 기존 placeholderBox 대신 MapWidget 사용 */}
           <div style={{ height: '300px', width: '100%' }}>
-            <MapWidget lat={myLocation.lat} lon={myLocation.lon} />
+            {/* Context에서 받은 lat, lon 사용. 로딩중이거나 null이면 처리 */}
+            {locLoading || !lat || !lon ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                    위치 정보 찾는 중...
+                </div>
+            ) : (
+                <MapWidget lat={lat} lon={lon} />
+            )}
           </div>
         </div>
 

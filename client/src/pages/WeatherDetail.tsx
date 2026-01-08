@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-import axios from 'axios';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IoIosArrowBack, IoMdClose } from 'react-icons/io';
 import { IoWater, IoSpeedometer, IoThermometer, IoUmbrella, IoTime, IoSunny, IoMoon } from 'react-icons/io5';
@@ -10,39 +9,13 @@ import {
 } from 'react-icons/wi';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// [변경] 공통 훅 임포트
+import { useUserLocation } from '../contexts/UserLocationContext';
+import { useWeather } from '../hooks/useWeather';
+import { useWeatherFormatter } from '../hooks/useWeatherFormatter';
+import type { WeatherData } from '../types/weather';
+
 // --- 인터페이스 정의 ---
-interface HourlyData {
-  time: string;
-  temp: number;
-  sky: string;
-  type?: string; 
-  isNight?: boolean;
-}
-
-interface DailyData {
-  date: string;
-  maxTemp: number;
-  minTemp: number;
-  sky: string;
-  rainChance: number;
-}
-
-interface WeatherData {
-  location: string;
-  currentTemp: number;
-  currentSky: string;
-  feelsLike: number;
-  humidity: number;
-  windSpeed: number;
-  uvIndex: number;
-  rainChance: number;
-  pressure: number;
-  sunrise: string;
-  sunset: string;
-  hourlyForecast: HourlyData[];
-  weeklyForecast: DailyData[];
-}
-
 interface DetailBoxProps {
   id: string;
   title: string;
@@ -86,22 +59,6 @@ const getMinutes = (timeStr: string) => {
   if (!timeStr || !timeStr.includes(':')) return 0;
   const [h, m] = timeStr.split(':').map(Number);
   return h * 60 + m;
-};
-
-const checkIsNight = (targetTimeStr: string, sunrise: string, sunset: string) => {
-  if (!targetTimeStr || !sunrise || !sunset) return false;
-  
-  let targetM = 0;
-  if (targetTimeStr.includes(':')) {
-     targetM = getMinutes(targetTimeStr);
-  } else {
-     return false; 
-  }
-
-  const sunriseM = getMinutes(sunrise);
-  const sunsetM = getMinutes(sunset);
-  
-  return targetM >= sunsetM || targetM < sunriseM;
 };
 
 const DetailBox = ({ id, title, icon, value, unit = "", desc, onClick }: DetailBoxProps) => (
@@ -354,49 +311,19 @@ const getDetailContent = (id: string, w: WeatherData) => {
 
 export default function WeatherDetail() {
   const navigate = useNavigate();
-  const [weather, setWeather] = useState<WeatherData | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragConstraint, setDragConstraint] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  useEffect(() => {
-    const fetchWeather = async (lat?: number, lon?: number) => {
-      try {
-        const url = lat ? `http://localhost:8080/api/weather?lat=${lat}&lon=${lon}` : 'http://localhost:8080/api/weather';
-        const res = await axios.get(url);
-        setWeather(res.data);
-      } catch (e) { console.error(e); }
-    };
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude), () => fetchWeather());
-    } else { fetchWeather(); }
-  }, []);
+  // 1. [변경] 전역 위치 정보 구독 (Context 사용)
+  const { lat, lon, loading: locLoading } = useUserLocation();
+  // 2. [변경] 해당 위치로 날씨 데이터 조회 (Hook 사용)
+  const { weather, loading: weatherLoading } = useWeather(lat, lon);
+  // 3. [변경] UI 표시용 데이터 가공 (Hook 사용 - 중복 로직 제거됨!)
+  // 기존에는 useMemo로 직접 구현했던 부분을 훅 한 줄로 대체
+  const { isCurrentNight, processedHourly } = useWeatherFormatter(weather, 24); // 상세페이지니까 24개 보여줌
 
-  const isCurrentNight = useMemo(() => {
-    if (!weather) return false;
-    const now = new Date();
-    const h = String(now.getHours()).padStart(2, '0');
-    const m = String(now.getMinutes()).padStart(2, '0');
-    return checkIsNight(`${h}:${m}`, weather.sunrise, weather.sunset);
-  }, [weather]);
-
-  const processedHourly = useMemo(() => {
-    if (!weather) return [];
-    
-    return weather.hourlyForecast.map((hour) => {
-      if (hour.type === 'special') return { ...hour, isNight: false };
-
-      const isNight = checkIsNight(hour.time, weather.sunrise, weather.sunset);
-      
-      let displaySky = hour.sky;
-      if (isNight && hour.sky === '맑음') {
-        displaySky = '맑은밤';
-      }
-      // [수정 완료] 이제 sky 값을 displaySky로 덮어써서 반환합니다.
-      return { ...hour, sky: displaySky, isNight }; 
-    });
-  }, [weather]);
-
+  // 스크롤 제약 계산 (기존 로직 유지)
   useEffect(() => {
     if (processedHourly.length > 0 && scrollRef.current) {
       const width = scrollRef.current.scrollWidth - scrollRef.current.offsetWidth;
@@ -404,7 +331,7 @@ export default function WeatherDetail() {
     }
   }, [processedHourly]);
 
-  if (!weather) return <div style={{ background: '#000', height: '100vh', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading...</div>;
+  if (locLoading || weatherLoading || !weather) return <div style={{ background: '#000', height: '100vh', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading...</div>;
 
   const selectedContent = selectedId ? getDetailContent(selectedId, weather) : null;
   const weeklyMin = Math.min(...weather.weeklyForecast.map(d => d.minTemp));

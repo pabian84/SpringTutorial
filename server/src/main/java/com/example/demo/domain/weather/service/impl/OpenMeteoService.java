@@ -3,6 +3,7 @@ package com.example.demo.domain.weather.service.impl;
 import com.example.demo.domain.weather.dto.WeatherRes;
 import com.example.demo.domain.weather.service.WeatherProvider;
 
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -17,6 +18,12 @@ import java.util.*;
 
 @Service
 public class OpenMeteoService implements WeatherProvider {
+    // [수정] RestTemplate을 매번 생성하지 않고 주입받아 사용 (Spring 정석)
+    private final RestTemplate restTemplate;
+
+    public OpenMeteoService(RestTemplateBuilder builder) {
+        this.restTemplate = builder.build();
+    }
 
     @Override
     public WeatherRes getWeather(double lat, double lon) {
@@ -27,8 +34,7 @@ public class OpenMeteoService implements WeatherProvider {
                 + "&hourly=temperature_2m,weather_code,precipitation_probability"
                 + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max"
                 + "&timezone=auto&forecast_days=7";
-
-        RestTemplate restTemplate = new RestTemplate();
+        
         Map<String, Object> response = restTemplate.getForObject(url, Map.class);
 
         // 데이터 파싱 (복잡한 로직은 Service에 숨김)
