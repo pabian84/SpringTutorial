@@ -78,7 +78,7 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
              setLocation(prev => ({ ...prev, loading: false, error: '위치 정보 수신 실패' }));
         }
       },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);

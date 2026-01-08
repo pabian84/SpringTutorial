@@ -4,6 +4,7 @@ import com.example.demo.domain.weather.dto.WeatherRes;
 import com.example.demo.domain.weather.service.WeatherProvider;
 
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -26,6 +27,8 @@ public class OpenMeteoService implements WeatherProvider {
     }
 
     @Override
+    // [추가] "weather"라는 이름의 캐시에 저장. lat, lon이 같으면 캐시된 데이터 반환
+    @Cacheable(value = "weather", key = "#lat + '-' + #lon")
     public WeatherRes getWeather(double lat, double lon) {
         // 1. 날씨 데이터 가져오기 (Open-Meteo)
         String url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat
