@@ -6,6 +6,9 @@ import com.example.demo.domain.user.entity.AccessLog;
 import com.example.demo.domain.user.entity.User;
 import com.example.demo.domain.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import java.util.*;
 
@@ -14,6 +17,7 @@ import java.util.*;
 public class UserService {
     private final UserMapper userMapper;
 
+    @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
     public Map<String, Object> login(UserLoginReq req) {
         User user = userMapper.findById(req.getId());
         Map<String, Object> result = new HashMap<>();
@@ -29,11 +33,13 @@ public class UserService {
         return result;
     }
 
+    @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
     public void logout(String userId) {
         userMapper.saveLog(userId, "LOGOUT");
     }
 
     // [수정됨] 반환 타입이 List<User> -> List<UserRes>로 변경
+    @Cacheable(value = "users") // [캐시 적용] 전체 유저 목록은 10분 동안 DB 조회 없이 캐시된 값 반환
     public List<UserRes> getUserList() {
         // 1. 창고에서 원본(User)을 다 꺼내옴
         List<User> userEntities = userMapper.findAll();
@@ -51,6 +57,10 @@ public class UserService {
     }
 
     // 접속 중인 유저 리스트 반환
+    /// [캐시 적용] 접속자 목록은 1분 동안 DB 조회 없이 캐시된 값 반환
+    // 로그인/로그아웃 시 데이터가 변하더라도 1분 정도의 오차는 허용하거나, 
+    // login/logout 메서드에 @CacheEvict(value = "online_users", allEntries = true)를 붙여서 즉시 갱신할 수도 있습니다.
+    @Cacheable(value = "online_users") // [캐시 적용] 접속자 목록은 1분 동안 DB 조회 없이 캐시된 값 반환
     public List<UserRes> getOnlineUserList() {
         List<User> userEntities = userMapper.findOnlineUsers();
         List<UserRes> result = new ArrayList<>();
