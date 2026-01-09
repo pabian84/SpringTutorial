@@ -1,17 +1,18 @@
 import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-
+import { FaMapMarkedAlt } from 'react-icons/fa';
 import { useUserLocation } from '../contexts/UserLocationContext';
 
 import { useQuery } from '@tanstack/react-query'; // 임포트 추가
 import { BiExpand, BiX } from 'react-icons/bi';
 
-import MapWidget from '../components/MapWidget';
+//import MapWidget from '../components/MapWidget';
 import ServerMonitor from '../components/Servermonitor';
 import MemoWidget from '../components/MemoWidget';
 import ChatWidget, { type ChatMessage } from '../components/ChatWidget'; 
 import WeatherWidget from '../components/WeatherWidget';
+import KakaoMapWidget from '../components/KakaoMapWidget';
 
 interface UserData {
   id: string;
@@ -231,8 +232,11 @@ export default function Dashboard() {
 
         {/* [왼쪽 중간] 지도 기능 (준비중) */}
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>🗺 City Map</h3>
-          {/* 기존 placeholderBox 대신 MapWidget 사용 */}
+          <h3 style={{ ...styles.sectionTitle, justifyContent: 'flex-start', gap: '10px' }}>
+            <FaMapMarkedAlt style={{ color: '#00c6ff', fontSize: '24px' }} />
+            지도 정보
+          </h3>
+          {/* 기존 placeholderBox 대신 KakaoMapWidget 사용 */}
           <div style={{ height: '300px', width: '100%' }}>
             {/* Context에서 받은 lat, lon 사용. 로딩중이거나 null이면 처리 */}
             {locLoading || !lat || !lon ? (
@@ -240,7 +244,7 @@ export default function Dashboard() {
                     위치 정보 찾는 중...
                 </div>
             ) : (
-                <MapWidget lat={lat} lon={lon} />
+                <KakaoMapWidget lat={lat} lon={lon} />
             )}
           </div>
         </div>
