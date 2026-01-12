@@ -1,7 +1,6 @@
 package com.example.demo.domain.memo.controller;
 
 import com.example.demo.domain.memo.entity.Memo;
-import com.example.demo.domain.memo.mapper.MemoMapper;
 import com.example.demo.domain.memo.service.MemoService;
 
 import lombok.RequiredArgsConstructor;

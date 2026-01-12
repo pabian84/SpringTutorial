@@ -29,9 +29,18 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     // lombok 애노테이션 프로세서
     annotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
 // 자바 컴파일 시 파라미터 이름을 유지하도록 설정 (Spring Boot 3.2+ 필수)
+// 인코딩 설정 추가
 tasks.withType(JavaCompile) {
     options.compilerArgs << '-parameters'
+    options.encoding = 'UTF-8'  // [추가] 소스 코드 인코딩을 UTF-8로 고정
+}
+
+// [추가] 실행할 때도 UTF-8로 실행하도록 설정 (bootRun 등 사용 시)
+tasks.withType(JavaExec) {
+    systemProperty "file.encoding", "UTF-8"
 }

@@ -6,12 +6,14 @@ import com.example.demo.domain.user.entity.AccessLog;
 import com.example.demo.domain.user.entity.User;
 import com.example.demo.domain.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // [추가 1] 로그 기능 임포트
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {

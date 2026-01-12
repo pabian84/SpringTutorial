@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { FaMapMarkedAlt } from 'react-icons/fa';
+import { FaMapMarkedAlt, FaChartLine } from 'react-icons/fa';
 import { useUserLocation } from '../contexts/UserLocationContext';
 
 import { useQuery } from '@tanstack/react-query'; // 임포트 추가
@@ -13,6 +13,7 @@ import MemoWidget from '../components/MemoWidget';
 import ChatWidget, { type ChatMessage } from '../components/ChatWidget'; 
 import WeatherWidget from '../components/WeatherWidget';
 import KakaoMapWidget from '../components/KakaoMapWidget';
+import ExchangeWidget from '../components/ExchangeWidget'; // [추가] 방금 만든 위젯 임포트
 
 interface UserData {
   id: string;
@@ -247,6 +248,20 @@ export default function Dashboard() {
                 <KakaoMapWidget lat={lat} lon={lon} />
             )}
           </div>
+        </div>
+
+        {/* 금융 차트 위젯 (지도 아래에 배치) */}
+        <div style={styles.card}>
+            <h3 style={styles.sectionTitle}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <FaChartLine style={{ color: '#f59e0b', fontSize: '24px' }} />
+                    Global Exchange Rates
+                </span>
+            </h3>
+            {/* 차트 영역 */}
+            <div style={{ height: '250px', width: '100%' }}>
+                <ExchangeWidget />
+            </div>
         </div>
 
         {/* [하단 영역 수정됨] 3분할: 서버(2) : 메모(1) : 채팅(1) */}

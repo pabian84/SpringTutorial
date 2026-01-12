@@ -3,6 +3,7 @@ package com.example.demo.domain.memo.service;
 import com.example.demo.domain.memo.entity.Memo;
 import com.example.demo.domain.memo.mapper.MemoMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // [추가 1] 로그 기능 임포트
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MemoService {
@@ -29,6 +31,7 @@ public class MemoService {
     @Transactional(readOnly = true) // 조회 전용 트랜잭션 (성능 최적화)
     @Cacheable(value = "memos", key = "#userId")
     public List<Memo> getMemos(String userId) {
+        log.info("========== [DB Query] No cache found. Fetching data from DB! userId: {} ==========", userId);
         return memoMapper.findAll(userId);
     }
 

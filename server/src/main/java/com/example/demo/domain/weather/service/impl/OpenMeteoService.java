@@ -12,11 +12,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+@Slf4j
 @Service
 public class OpenMeteoService implements WeatherProvider {
     // [수정] RestTemplate을 매번 생성하지 않고 주입받아 사용 (Spring 정석)
@@ -30,6 +33,9 @@ public class OpenMeteoService implements WeatherProvider {
     // [추가] "weather"라는 이름의 캐시에 저장. lat, lon이 같으면 캐시된 데이터 반환
     @Cacheable(value = "weather", key = "#lat + '-' + #lon")
     public WeatherRes getWeather(double lat, double lon) {
+
+        log.info("========== [DB Query] No cache found. Fetching data from DB! lat: {}, lon: {} ==========", lat, lon);
+
         // 1. 날씨 데이터 가져오기 (Open-Meteo)
         String url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat
                 + "&longitude=" + lon
