@@ -1,55 +1,46 @@
 package com.example.demo.domain.user.controller;
 
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.demo.domain.user.dto.UserLoginReq;
 import com.example.demo.domain.user.dto.UserRes;
 import com.example.demo.domain.user.entity.AccessLog;
-import com.example.demo.domain.user.entity.User;
-import com.example.demo.domain.user.mapper.UserMapper;
 import com.example.demo.domain.user.service.UserService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-
-import org.springframework.web.bind.annotation.*;
-import java.util.*;
 
 @Tag(name = "User API", description = "사용자/로그인 관련 API")
 @RestController
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
 public class UserController {
-    private final UserMapper userMapper;
     private final UserService userService;
 
     @Operation(summary = "로그인")
     @PostMapping("/login")
-    public Map<String, Object> login(@RequestBody UserLoginReq req) {
-        User user = userMapper.findById(req.getId());
-        Map<String, Object> result = new HashMap<>();
-
-        if (user != null && user.getPassword().equals(req.getPassword())) {
-            userMapper.saveLog(user.getId(), "LOGIN");
-            
-            // [추가] 접속 상태를 ON으로 변경
-            userService.updateUserStatus(user.getId(), true);
-
-            result.put("status", "ok");
-            UserRes userRes = new UserRes(user.getId(), user.getName());
-            result.put("user", userRes);
-        } else {
-            result.put("status", "fail");
-        }
-        return result;
+    public Map<String, Object> login(@RequestBody UserLoginReq req, HttpServletRequest request) {
+        // IP와 브라우저 정보를 추출해서 서비스로 넘김
+        String ip = request.getRemoteAddr();
+        String userAgent = request.getHeader("User-Agent");
+        
+        return userService.login(req, ip, userAgent);
     }
 
     @Operation(summary = "로그아웃")
     @PostMapping("/logout")
     public void logout(@RequestBody Map<String, String> body) {
-        String userId = body.get("userId");
-        userMapper.saveLog(userId, "LOGOUT");
-        
-        // [추가] 접속 상태를 OFF로 변경
-        userService.updateUserStatus(userId, false);
+        userService.logout(body.get("userId"));
     }
 
     @Operation(summary = "접속 중인 사용자 조회")

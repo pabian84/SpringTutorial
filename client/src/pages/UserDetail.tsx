@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { showAlert } from '../utils/Alert';
+import { showAlert } from '../utils/alert';
+import { FaDesktop, FaMobileAlt, FaChrome, FaEdge, FaSafari, FaFirefox, FaQuestionCircle } from 'react-icons/fa';
 
 interface LogData {
   seq: number;
   type: string;
   logTime: string;
+  ipAddress: string; // [추가]
+  browser: string;   // [추가]
+  os: string;        // [추가]
 }
 
 export default function UserDetail() {
@@ -35,6 +39,23 @@ export default function UserDetail() {
     
     // 예: 2024. 12. 17. 오후 5:30:00
     return date.toLocaleString('ko-KR'); 
+  };
+
+  // 아이콘 매핑 헬퍼
+  const getBrowserIcon = (browser: string) => {
+    const b = browser?.toLowerCase() || '';
+    if (b.includes('chrome')) return <FaChrome color="#4285F4" />;
+    if (b.includes('edge')) return <FaEdge color="#0078D7" />;
+    if (b.includes('safari')) return <FaSafari color="#00A4E0" />;
+    if (b.includes('firefox')) return <FaFirefox color="#FF7139" />;
+    return <FaQuestionCircle color="#888" />;
+  };
+
+  const getOsIcon = (os: string) => {
+    const o = os?.toLowerCase() || '';
+    if (o.includes('windows') || o.includes('mac')) return <FaDesktop color="#ccc" />;
+    if (o.includes('android') || o.includes('iphone')) return <FaMobileAlt color="#ccc" />;
+    return <FaQuestionCircle color="#888" />;
   };
 
   // [수정 2] 스타일 객체로 분리 (다크 모드 디자인 통일)
@@ -82,6 +103,16 @@ export default function UserDetail() {
     typeLogout: {
       color: '#f87171', // 밝은 빨간색
       fontWeight: 'bold'
+    },
+    infoTag: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      marginRight: '10px',
+      backgroundColor: '#374151',
+      padding: '4px 8px',
+      borderRadius: '4px',
+      fontSize: '12px'
     }
   };
 
@@ -98,20 +129,22 @@ export default function UserDetail() {
       <table style={styles.table}>
         <thead>
           <tr>
-            <th style={styles.th}>Time</th>
-            <th style={styles.th}>Activity</th>
+            <th style={{ ...styles.th, width: '25%' }}>Time</th>
+            <th style={{ ...styles.th, width: '15%' }}>Type</th>
+            <th style={styles.th}>Environment (OS / Browser)</th>
+            <th style={styles.th}>IP</th>
           </tr>
         </thead>
         <tbody>
           {logs.length === 0 ? (
             <tr>
-              <td colSpan={2} style={{ ...styles.td, textAlign: 'center', padding: '30px' }}>
+              <td colSpan={4} style={{ ...styles.td, textAlign: 'center', padding: '30px' }}>
                 기록된 활동 로그가 없습니다.
               </td>
             </tr>
           ) : (
-            logs.map(log => (
-              <tr key={log.seq}>
+            logs.map((log, idx) => (
+              <tr key={idx}>
                 <td style={styles.td}>
                     {/* [수정] 날짜 포맷 적용 */}
                     {formatDate(log.logTime)}
@@ -123,6 +156,11 @@ export default function UserDetail() {
                     <span style={styles.typeLogout}>🔴 로그아웃 (Logout)</span>
                   )}
                 </td>
+                <td style={styles.td}>
+                  <span style={styles.infoTag}>{getOsIcon(log.os)} {log.os || 'Unknown'}</span>
+                  <span style={styles.infoTag}>{getBrowserIcon(log.browser)} {log.browser || 'Unknown'}</span>
+                </td>
+                <td style={{ ...styles.td, fontFamily: 'monospace', color: '#aaa' }}>{log.ipAddress}</td>
               </tr>
             ))
           )}

@@ -325,13 +325,13 @@ public class OpenMeteoService implements WeatherProvider {
             // 1. 일출 구간 (앞뒤 15분)
             if (isWithinRange(now, sunrise, 15)) {
                 System.out.println("일출 구간 감지: " + now + " / " + sunrise);
-                return "일출";
+                return "일출(" + sunrise.toString().substring(11, 16) + ")"; // 일출 상태 반환
             }
 
             // 2. 일몰 구간 (앞뒤 15분)
             if (isWithinRange(now, sunset, 15)) {
                 System.out.println("일몰 구간 감지: " + now + " / " + sunset);
-                return "일몰";
+                return "일몰(" + sunset.toString().substring(11, 16) + ")"; // 일몰 상태 반환
             }
 
         } catch (Exception e) {

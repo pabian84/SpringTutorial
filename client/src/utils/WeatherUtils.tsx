@@ -81,8 +81,8 @@ export const calculateCelestialPosition = (sunrise: string, sunset: string) => {
 
 // 날씨 에셋 분석 로직
 export const getWeatherAsset = (sky: string, isNight: boolean): WeatherAsset => {
-  if (sky === '일출') return { type: 'sunrise', Icon: WiSunrise, color: '#FFD700' };
-  if (sky === '일몰') return { type: 'sunset', Icon: WiSunset, color: '#FFA500' };
+  if (sky.includes('일출')) return { type: 'sunrise', Icon: WiSunrise, color: '#FFD700' };
+  if (sky.includes('일몰')) return { type: 'sunset', Icon: WiSunset, color: '#FFA500' };
 
   if (isNight) {
     if (sky.includes('구름조금')) return { type: 'cloud', Icon: WiNightAltCloudy };

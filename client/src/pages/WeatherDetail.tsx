@@ -79,8 +79,8 @@ const DetailBox = ({ id, title, icon, value, unit = "", desc, onClick }: DetailB
 // 날씨 상태 분석 공통 함수
 const getWeatherAsset = (sky: string, isNight: boolean): WeatherAsset => {
   // 특수 케이스
-  if (sky === '일출') return { type: 'sunrise', Icon: WiSunrise, color: '#FFD700' };
-  if (sky === '일몰') return { type: 'sunset', Icon: WiSunset, color: '#FFA500' };
+  if (sky.includes('일출')) return { type: 'sunrise', Icon: WiSunrise, color: '#FFD700' };
+  if (sky.includes('일몰')) return { type: 'sunset', Icon: WiSunset, color: '#FFA500' };
 
   // 밤
   if (isNight) {

@@ -1,35 +1,38 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { showAlert, showToast } from '../utils/Alert';
+import { showAlert, showToast } from '../utils/alert';
 
 export default function Login() {
   const [id, setId] = useState('admin');
   const [password, setPassword] = useState('1234');
-  // [추가] 로그인 유지 체크박스 상태
+  // 로그인 유지 체크박스 상태
   const [keepLogin, setKeepLogin] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); // form submit 시 페이지 새로고침 방지
     try {
-      const res = await axios.post('http://localhost:8080/api/user/login', { id, password });
+      const res = await axios.post('api/user/login', { id, password });
       
       if (res.data.status === 'ok') {
-        // [변경] 성공 시 가볍게 토스트 알림을 띄우고 이동
-        showToast(`환영합니다, ${res.data.user.name}님!`, 'success');
+        const { accessToken, refreshToken, user } = res.data;
+        // 체크 여부에 따라 저장소 결정
+        const storage = keepLogin ? localStorage : sessionStorage;
+
+        // 기존에 다른 저장소에 남아있을 수 있는 토큰 삭제 (충돌 방지)
+        ['accessToken', 'refreshToken', 'myId'].forEach(key => {
+            localStorage.removeItem(key);
+            sessionStorage.removeItem(key);
+        });
+
+        // 선택된 저장소에 저장
+        storage.setItem('accessToken', accessToken);
+        storage.setItem('refreshToken', refreshToken);
+        storage.setItem('myId', user.id);
         
-        const userId = res.data.user.id;
-        // [핵심 로직 변경]
-        if (keepLogin) {
-          // 1. 로그인 유지 체크 O -> localStorage (브라우저 꺼도 남음)
-          localStorage.setItem('myId', userId);
-          sessionStorage.removeItem('myId'); // 꼬임 방지용 삭제
-        } else {
-          // 2. 로그인 유지 체크 X -> sessionStorage (브라우저 끄면 사라짐)
-          sessionStorage.setItem('myId', userId);
-          localStorage.removeItem('myId'); // 꼬임 방지용 삭제
-        }
+        // 성공 시 가볍게 토스트 알림을 띄우고 이동
+        showToast(`환영합니다, ${res.data.user.name}님!`, 'success');
         navigate('/dashboard');
       } else {
         // [변경] 실패 시 모달 창 띄우기
