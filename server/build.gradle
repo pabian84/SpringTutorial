@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.2.0'
     id 'io.spring.dependency-management' version '1.1.4'
+    id 'eclipse'
 }
 
 group = 'com.example'
@@ -33,6 +34,18 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
+// 이 부분이 작동하려면 맨 위 plugins에 id 'eclipse'가 필수입니다.
+// VS Code가 컴파일할 때 파라미터 이름을 유지하도록 내부 설정을 덮어씌웁니다.
+eclipse {
+    jdt {
+        file {
+            withProperties { props ->
+                props['org.eclipse.jdt.core.compiler.codegen.methodParameters'] = 'generate'
+            }
+        }
+    }
+}
+
 // 자바 컴파일 시 파라미터 이름을 유지하도록 설정 (Spring Boot 3.2+ 필수)
 // 인코딩 설정 추가
 tasks.withType(JavaCompile) {
@@ -40,7 +53,7 @@ tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'  // [추가] 소스 코드 인코딩을 UTF-8로 고정
 }
 
-// [추가] 실행할 때도 UTF-8로 실행하도록 설정 (bootRun 등 사용 시)
-tasks.withType(JavaExec) {
-    systemProperty "file.encoding", "UTF-8"
-}
+// 실행할 때도 UTF-8로 실행하도록 설정 (bootRun 등 사용 시)
+// tasks.withType(JavaExec) {
+//     systemProperty "file.encoding", "UTF-8"
+// }
