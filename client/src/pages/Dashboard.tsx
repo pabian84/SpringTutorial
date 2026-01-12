@@ -6,6 +6,7 @@ import { useUserLocation } from '../contexts/UserLocationContext';
 
 import { useQuery } from '@tanstack/react-query'; // 임포트 추가
 import { BiExpand, BiX } from 'react-icons/bi';
+import { FaCode } from 'react-icons/fa';
 
 //import MapWidget from '../components/MapWidget';
 import ServerMonitor from '../components/Servermonitor';
@@ -14,6 +15,7 @@ import ChatWidget, { type ChatMessage } from '../components/ChatWidget';
 import WeatherWidget from '../components/WeatherWidget';
 import KakaoMapWidget from '../components/KakaoMapWidget';
 import ExchangeWidget from '../components/ExchangeWidget'; // [추가] 방금 만든 위젯 임포트
+import CodeStatsWidget from '../components/CodeStatsWidget';
 
 interface UserData {
   id: string;
@@ -231,7 +233,7 @@ export default function Dashboard() {
           </ul>
         </div>
 
-        {/* [왼쪽 중간] 지도 기능 (준비중) */}
+        {/* [왼쪽 중간] 지도 기능 KakaoMapWidget */}
         <div style={styles.card}>
           <h3 style={{ ...styles.sectionTitle, justifyContent: 'flex-start', gap: '10px' }}>
             <FaMapMarkedAlt style={{ color: '#00c6ff', fontSize: '24px' }} />
@@ -250,18 +252,33 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 금융 차트 위젯 (지도 아래에 배치) */}
-        <div style={styles.card}>
+        <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          {/* 환율 차트 위젯 (지도 아래에 배치) */}
+          <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <FaChartLine style={{ color: '#f59e0b', fontSize: '24px' }} />
+                      Global Exchange Rates
+                  </span>
+              </h3>
+              {/* 차트 영역 */}
+              <div style={{ height: '250px', width: '100%' }}>
+                  <ExchangeWidget />
+              </div>
+          </div>
+
+          {/* 프로젝트 코드 통계 (1/2 사이즈 */}
+          <div style={styles.card}>
             <h3 style={styles.sectionTitle}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <FaChartLine style={{ color: '#f59e0b', fontSize: '24px' }} />
-                    Global Exchange Rates
+                    <FaCode style={{ color: '#3178c6', fontSize: '24px' }} />
+                    Project Tech Stack
                 </span>
             </h3>
-            {/* 차트 영역 */}
             <div style={{ height: '250px', width: '100%' }}>
-                <ExchangeWidget />
+                <CodeStatsWidget />
             </div>
+          </div>
         </div>
 
         {/* [하단 영역 수정됨] 3분할: 서버(2) : 메모(1) : 채팅(1) */}

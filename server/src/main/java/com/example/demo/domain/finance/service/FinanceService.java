@@ -23,6 +23,7 @@ public class FinanceService {
         result.add(fetchRate("USD", "미국 달러"));
         result.add(fetchRate("JPY", "일본 엔화 (100엔)")); // 100엔 기준으로 변환 필요
         result.add(fetchRate("EUR", "유럽 유로"));
+        result.add(fetchRate("CNY", "중국 위안"));
 
         return result;
     }

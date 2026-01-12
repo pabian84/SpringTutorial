@@ -39,8 +39,8 @@ mybatis:
     map-underscore-to-camel-case: true  # 이 줄이 있어야 날짜가 제대로 나옵니다.
 
 # 로그 설정
-logging:
-  level:
-    root: INFO
-    # com.example.demo: DEBUG  # 우리 프로젝트 로그 자세히 보기
-    "[org.springframework.cache]": TRACE # 캐시 동작 과정 자세히 보기 (필수)
+# logging:
+#   level:
+#     root: INFO
+#     # com.example.demo: DEBUG  # 우리 프로젝트 로그 자세히 보기
+#     "[org.springframework.cache]": TRACE # 캐시 동작 과정 자세히 보기 (필수)

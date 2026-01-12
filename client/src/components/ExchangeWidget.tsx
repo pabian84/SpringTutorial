@@ -16,9 +16,10 @@ export default function ExchangeWidget() {
 
   useEffect(() => {
     // 스프링 서버 API 호출
-    axios.get<StockRes[]>('/api/finance/dashboard')
+    axios.get<StockRes[]>('api/finance/dashboard')
       .then(res => {
         setData(res.data);
+        setLoading(false);
       })
       .catch(err => {
         console.error("환율 데이터 로딩 실패:", err);
@@ -34,21 +35,35 @@ export default function ExchangeWidget() {
   }
 
   return (
-    <div style={{ padding: '20px', background: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-      <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 'bold', color: '#333' }}>
-        🌍 실시간 주요 환율 (KRW)
-      </h3>
-      
-      <div style={{ width: '100%', height: '250px' }}>
+    <div style={{ width: '100%', height: '100%' }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-            <XAxis dataKey="symbol" tick={{ fill: '#666' }} />
-            <YAxis tick={{ fill: '#666' }} />
+          <BarChart data={data} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
+            {/* 다크 테마라 글씨가 안 보일 수 있어서 밝은 색(#ccc)으로 변경 */}
+            <XAxis dataKey="symbol" tick={{ fill: '#ccc', fontSize: 12 }} />
+            <YAxis tick={{ fill: '#ccc', fontSize: 12 }} />
             <Tooltip 
               cursor={{ fill: 'transparent' }}
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+              contentStyle={{ 
+              borderRadius: '8px', 
+              border: 'none', 
+              boxShadow: '0 2px 8px rgba(0,0,0,0.5)', 
+              backgroundColor: '#333', // 툴팁 배경도 어둡게
+              color: '#fff' 
+            }}
+            itemStyle={{ color: '#fff' }}
+            // [1] 타이틀 변경: symbol(USD) 대신 name(미국 달러)을 보여줌
+            // label은 현재 X축 값(symbol)이 들어오는데, 이걸로 data 배열에서 name을 찾아서 보여줍니다.
+            labelFormatter={(label) => {
+              const item = data.find(d => d.symbol === label);
+              return item ? item.name : label;
+            }}
+            // [2] 값 포맷 변경: 소수점 2자리 + 천단위 콤마 + 단위(원) 추가
+            formatter={(value: number | undefined) => [
+              `${value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 원`, 
+              "환율" // 'price' 대신 보여줄 라벨 이름
+            ]}
             />
-            <Bar dataKey="price" radius={[8, 8, 0, 0]} barSize={50}>
+            <Bar dataKey="price" radius={[4, 4, 0, 0]} barSize={40}>
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
@@ -56,6 +71,5 @@ export default function ExchangeWidget() {
           </BarChart>
         </ResponsiveContainer>
       </div>
-    </div>
   );
 }
