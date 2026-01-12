@@ -9,7 +9,8 @@
             "projectName": "server",
             "args": "",
             "envFile": "${workspaceFolder}/.env",
-            "vmArgs": "-Dfile.encoding=UTF-8"
+            "vmArgs": "-Dfile.encoding=MS949"
+            //"vmArgs": "-Dfile.encoding=UTF-8"
         }
     ]
 }
