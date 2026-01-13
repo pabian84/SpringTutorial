@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { showToast } from '../utils/Alert';
+import { showToast } from '../utils/alert';
 
 interface SystemData {
   time: string;
@@ -13,7 +13,7 @@ export default function ServerMonitor() {
 
   useEffect(() => {
     // 1. 웹소켓 연결
-    const ws = new WebSocket('ws://localhost:8080/ws/system');
+    const ws = new WebSocket('ws://localhost:8080/ws/dashboard');
 
     ws.onopen = () => {
       console.log('서버 모니터링 연결 성공');
@@ -23,7 +23,8 @@ export default function ServerMonitor() {
       // 2. 서버에서 온 데이터 파싱
       const message = JSON.parse(event.data);
       
-      if (message.type === 'STATUS') {
+      // [Type 1] 시스템 상태만 처리 (차트용)
+      if (message.type === 'SYSTEM_STATUS') {
         const now = new Date();
         const timeStr = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
 

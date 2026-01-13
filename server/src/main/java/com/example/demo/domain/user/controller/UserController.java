@@ -18,10 +18,9 @@ import com.example.demo.domain.user.service.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Cookie;
-    import jakarta.servlet.http.HttpServletRequest;
-    import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 @Tag(name = "User API", description = "사용자/로그인 관련 API")
@@ -96,8 +95,8 @@ public class UserController {
     }
 
     @Operation(summary = "접속 중인 사용자 조회")
-    @GetMapping("/list")
-    public List<UserRes> list() {
+    @GetMapping("/onlineList")
+    public List<UserRes> onlineList() {
         // [수정] 전체 리스트 대신 접속 중인 리스트 반환
         return userService.getOnlineUserList();
     }

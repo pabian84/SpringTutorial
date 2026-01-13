@@ -1,21 +1,21 @@
-import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import { useEffect, useRef, useState } from 'react';
+import { FaChartLine, FaMapMarkedAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { FaMapMarkedAlt, FaChartLine } from 'react-icons/fa';
 import { useUserLocation } from '../contexts/UserLocationContext';
 
-import { useQuery } from '@tanstack/react-query'; // 임포트 추가
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // 임포트 추가
 import { BiExpand, BiX } from 'react-icons/bi';
 import { FaCode } from 'react-icons/fa';
 
 //import MapWidget from '../components/MapWidget';
-import ServerMonitor from '../components/Servermonitor';
-import MemoWidget from '../components/MemoWidget';
-import ChatWidget, { type ChatMessage } from '../components/ChatWidget'; 
-import WeatherWidget from '../components/WeatherWidget';
-import KakaoMapWidget from '../components/KakaoMapWidget';
-import ExchangeWidget from '../components/ExchangeWidget';
+import ChatWidget, { type ChatMessage } from '../components/ChatWidget';
 import CodeStatsWidget from '../components/CodeStatsWidget';
+import ExchangeWidget from '../components/ExchangeWidget';
+import KakaoMapWidget from '../components/KakaoMapWidget';
+import MemoWidget from '../components/MemoWidget';
+import ServerMonitor from '../components/Servermonitor';
+import WeatherWidget from '../components/WeatherWidget';
 import { showToast } from '../utils/alert';
 
 interface UserData {
@@ -25,7 +25,9 @@ interface UserData {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient(); // [추가] 수동 갱신용 클라이언트
   const myId = localStorage.getItem('myId');
+
   // [수정] useState로 관리하던 위치 정보 삭제 -> 전역 Context 사용
   // 이제 Dashboard가 위치를 직접 찾지 않고, Context가 찾은 값을 받아오기만 합니다.
   const { lat, lon, loading: locLoading } = useUserLocation();
@@ -42,15 +44,38 @@ export default function Dashboard() {
     }
   }, [myId, navigate]);
 
-  // 접속자 리스트 (React Query 적용) ---
+  // [수정] 접속자 리스트 (WebSocket 신호로 갱신) ---
   const { data: onlineUsers = [] } = useQuery({
-    queryKey: ['onlineUsers'], // 캐싱을 위한 고유 키
+    queryKey: ['onlineUsers'], 
     queryFn: async () => {
-      const res = await axios.get('http://localhost:8080/api/user/list');
+      const res = await axios.get('http://localhost:8080/api/user/onlineList');
       return res.data as UserData[];
     },
-    refetchInterval: 5000, // 5초마다 자동 갱신 (실시간 효과)
+    // refetchInterval: 5000, // [삭제] 더 이상 5초마다 낭비하지 않음
   });
+
+  // [신규] 대시보드 상태 감지용 WebSocket (User Update 감지)
+  useEffect(() => {
+    const dashboardWs = new WebSocket('ws://localhost:8080/ws/dashboard');
+
+    dashboardWs.onopen = () => console.log("대시보드 소켓 연결 성공");
+    
+    dashboardWs.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        // [핵심] 유저 변동 신호(USER_UPDATE)가 오면 목록 새로고침!
+        if (message.type === 'USER_UPDATE') {
+          queryClient.invalidateQueries({ queryKey: ['onlineUsers'] });
+        }
+      } catch (error) {
+        console.error("Dashboard WS Parsing Error:", error);
+      }
+    };
+
+    return () => {
+      dashboardWs.close();
+    };
+  }, [queryClient]);
 
   // 채팅 기록 불러오기 (React Query) -> DB에 저장된 이전 대화 로드
   useQuery({

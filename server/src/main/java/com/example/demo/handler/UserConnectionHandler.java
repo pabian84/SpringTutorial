@@ -19,13 +19,15 @@ import lombok.extern.slf4j.Slf4j;
 public class UserConnectionHandler extends TextWebSocketHandler {
 
     private final UserService userService;
+    private final DashboardHandler dashboardHandler; // 모니터링 핸들러
     
     // [핵심] 유저 ID별로 열려있는 세션들을 관리 (멀티 탭 지원)
     // Map<UserId, Set<Session>>
     private static final Map<String, Set<WebSocketSession>> userSessionsMap = new ConcurrentHashMap<>();
 
-    public UserConnectionHandler(UserService userService) {
+    public UserConnectionHandler(UserService userService, DashboardHandler systemStatusHandler) {
         this.userService = userService;
+        this.dashboardHandler = systemStatusHandler;
     }
 
     @Override
@@ -39,6 +41,9 @@ public class UserConnectionHandler extends TextWebSocketHandler {
             // 2. DB에 '온라인' 도장 쾅!
             userService.updateUserStatus(userId, true);
             log.info("접속 감지(Online): {}", userId);
+
+            // [호출] 유저 수 변동 방송해라!
+            dashboardHandler.broadcastUserUpdate();
         } else {
             try { session.close(); } catch (Exception e) {}
         }
@@ -58,6 +63,9 @@ public class UserConnectionHandler extends TextWebSocketHandler {
                     userSessionsMap.remove(userId); // 맵에서 삭제
                     userService.updateUserStatus(userId, false);
                     log.info("접속 종료(Offline): {}", userId);
+
+                    // [호출] 유저 수 변동 방송해라!
+                    dashboardHandler.broadcastUserUpdate();
                 } else {
                     log.info("탭 닫힘(여전히 접속중): {}, 남은 세션 수: {}", userId, sessions.size());
                 }
