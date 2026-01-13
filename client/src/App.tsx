@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { useEffect } from 'react';
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import UserDetail from './pages/UserDetail'
@@ -10,6 +11,21 @@ import { useConnection } from './hooks/useConnection';
 function AppContent() {
   // 여기서 주소 변경을 감시합니다. (이제 안전함!)
   useConnection(); 
+
+  // 앱 시작 시 토큰이 있으면 대시보드로 납치하는 로직
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // 1. 저장소에서 토큰 확인 (로그인 유지 체크했으면 local, 아니면 session에 있음)
+    const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+    
+    // 2. 토큰이 있고, 현재 페이지가 로그인 페이지('/')라면 -> 대시보드로 이동
+    if (token && location.pathname === '/') {
+      navigate('/dashboard');
+    }
+    // (선택사항) 반대로 토큰이 없는데 대시보드 접근하려 하면 쫓아내는 로직도 여기에 추가 가능
+  }, [navigate, location.pathname]);
 
   return (
     <Routes>

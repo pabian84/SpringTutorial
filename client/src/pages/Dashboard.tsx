@@ -14,8 +14,9 @@ import MemoWidget from '../components/MemoWidget';
 import ChatWidget, { type ChatMessage } from '../components/ChatWidget'; 
 import WeatherWidget from '../components/WeatherWidget';
 import KakaoMapWidget from '../components/KakaoMapWidget';
-import ExchangeWidget from '../components/ExchangeWidget'; // [추가] 방금 만든 위젯 임포트
+import ExchangeWidget from '../components/ExchangeWidget';
 import CodeStatsWidget from '../components/CodeStatsWidget';
+import { showToast } from '../utils/alert';
 
 interface UserData {
   id: string;
@@ -106,12 +107,33 @@ export default function Dashboard() {
     }
   };
 
-  const logout = async () => {
-    // 로그아웃 시 DB 상태 업데이트 요청
-    await axios.post('http://localhost:8080/api/user/logout', { userId: myId });
-    localStorage.clear();
-    sessionStorage.clear();
-    navigate('/');
+  // 로그아웃 처리 함수
+  const handleLogout = async () => {
+    try {
+      // 1. 현재 저장된 토큰 찾기 (Local or Session)
+      const refreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
+      const myId = localStorage.getItem('myId') || sessionStorage.getItem('myId');
+
+      if (myId && refreshToken) {
+        // 2. 서버에 "이 기기 로그아웃 시켜줘" 요청
+        await axios.post('api/user/logout', { 
+            userId: myId,
+            refreshToken: refreshToken // [핵심] 이걸 보내야 DB에서 얘만 지움
+        });
+      }
+    } catch (e) {
+      console.error("로그아웃 요청 실패:", e);
+      showToast('Logout failed on server side(session expired)', 'error');
+    } finally {
+      // 3. 클라이언트 정보 삭제 (소켓도 여기서 끊김 -> UserConnectionHandler가 오프라인 처리함)
+      ['accessToken', 'refreshToken', 'myId'].forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      });
+      
+      showToast('로그아웃 되었습니다.');
+      navigate('/');
+    }
   };
 
   // --- 스타일 정의 (Grid Layout) ---
@@ -197,7 +219,7 @@ export default function Dashboard() {
           <h1 style={{ margin: 0, fontSize: '24px' }}>Smart Dashboard</h1>
           <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>Logged in as {myId}</span>
         </div>
-        <button onClick={logout} style={{ width: 'auto', padding: '10px 20px', fontSize: '14px' }}>
+        <button onClick={handleLogout} style={{ width: 'auto', padding: '10px 20px', fontSize: '14px' }}>
           System Logout
         </button>
       </header>

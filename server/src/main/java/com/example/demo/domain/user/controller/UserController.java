@@ -40,6 +40,16 @@ public class UserController {
     @Operation(summary = "로그아웃")
     @PostMapping("/logout")
     public void logout(@RequestBody Map<String, String> body) {
+        // 프론트에서 { "userId": "...", "refreshToken": "..." } 이렇게 보내줘야 함
+        String userId = body.get("userId");
+        String refreshToken = body.get("refreshToken");
+        
+        userService.logout(userId, refreshToken);
+    }
+
+    @Operation(summary = "로그아웃(모든 기기)")
+    @PostMapping("/logoutAllDevices")
+    public void logoutAllDevices(@RequestBody Map<String, String> body) {
         userService.logout(body.get("userId"));
     }
 

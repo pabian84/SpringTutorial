@@ -82,10 +82,32 @@ public class UserService {
         return result;
     }
 
+    // 로그아웃 처리 (특정 기기)
+    @Transactional
+    @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
+    public void logout(String userId, String refreshToken) {
+        // 1. DB에서 해당 기기의 리프레시 토큰만 삭제
+        userMapper.deleteRefreshToken(refreshToken);
+        
+        // [중요] 여기서 updateStatus(false)를 하지 않습니다!
+        // 이유: PC에서 로그아웃했다고 해서, 핸드폰까지 오프라인 처리되면 안 되기 때문입니다.
+        // 진짜 오프라인 처리는 클라이언트가 소켓을 끊을 때 UserConnectionHandler가 알아서 합니다.
+        
+        // 2. 로그 기록
+        AccessLog logData = AccessLog.builder()
+                .userId(userId)
+                .type("LOGOUT")
+                .endpoint("/api/user/logout") // 엔드포인트 명시
+                .build();
+        userMapper.saveLog(logData);
+    }
+
+    // 로그아웃 처리 (모든 기기)
+    @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
     public void logout(String userId) {
         userMapper.updateStatus(userId, false);
-        userMapper.deleteRefreshToken(userId); // 토큰 삭제 (로그아웃 핵심)
+        userMapper.deleteAllRefreshTokens(userId); // 토큰 삭제 (로그아웃 핵심)
         
         // 로그 기록 (약식)
         AccessLog logData = AccessLog.builder()

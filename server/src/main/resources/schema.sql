@@ -1,7 +1,7 @@
 -- DROP TABLE IF EXISTS access_log;
 -- DROP TABLE IF EXISTS refresh_token;
 -- DROP TABLE IF EXISTS users;
-
+-- DROP TABLE IF EXISTS refresh_token;
 
 -- 사용자 테이블
 CREATE TABLE if not exists users (
@@ -28,14 +28,15 @@ CREATE TABLE if not exists access_log (
 
 -- 리프레시 토큰 저장소 (로그인 유지 핵심)
 CREATE TABLE if not exists refresh_token (
-    token_key VARCHAR(100) PRIMARY KEY, -- 사용자 ID (또는 이메일)
+    id BIGINT AUTO_INCREMENT PRIMARY KEY, -- [신규] 고유 번호 (PK)
+    user_id VARCHAR(50) NOT NULL,         -- [변경] 일반 컬럼 (중복 허용)
     token_value VARCHAR(512) NOT NULL,  -- 리프레시 토큰 값
     ip VARCHAR(50),
     browser VARCHAR(50),
     os VARCHAR(50),
     expiration TIMESTAMP NOT NULL,      -- 만료 시간
-    -- [신규] 토큰 주인(User)이 사라지면 토큰도 같이 사라져야 함 (ON DELETE CASCADE)
-    FOREIGN KEY (token_key) REFERENCES users(id) ON DELETE CASCADE
+    -- 토큰 주인(User)이 사라지면 토큰도 같이 사라져야 함 (ON DELETE CASCADE)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 메모 테이블

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { showAlert } from './alert';
+import { showToast } from './alert';
 
 // Axios 전역 설정
 export const setupAxiosInterceptors = () => {
@@ -20,16 +20,36 @@ export const setupAxiosInterceptors = () => {
   axios.interceptors.response.use(
     (response) => response,
     async (error) => {
-      // 401 에러 (토큰 만료 or 위조) 발생 시
-      if (error.response && error.response.status === 401) {
-        // 원래는 여기서 Refresh Token으로 재발급 시도를 해야 하지만,
-        // 일단 연습용이므로 깔끔하게 로그아웃 시키고 튕겨냅니다.
-        showAlert("세션 오류", "세션이 만료되었습니다. 다시 로그인해주세요.", "error");
-        ['accessToken', 'refreshToken', 'myId'].forEach(key => {
-            localStorage.removeItem(key);
-            sessionStorage.removeItem(key);
-        });
-        window.location.href = '/'; // 로그인 페이지로 강제 이동
+      const originalRequest = error.config;
+
+      // 1. 401 에러(인증 실패)가 떴는데, 아직 재시도를 안 한 요청이라면
+      if (error.response && error.response.status === 401 && !originalRequest._retry) {
+        originalRequest._retry = true; // "재시도 했다"고 표시
+
+        try {
+            // 2. 리프레시 토큰으로 새 액세스 토큰 달라고 떼써보기
+            // (주의: 여기 URL이나 로직이 서버 구현과 맞아야 함)
+            /* 지금은 Refresh 로직이 복잡할 수 있으니, 
+               심플하게 "401 뜨면 그냥 로그아웃 시키는" 안전빵 코드로 갑니다.
+               나중에 Refresh Token Rotation을 완벽히 구현하면 그때 살리세요.
+            */
+             
+            // 만약 리프레시 토큰 로직이 없다면 바로 아래 catch로 넘어갑니다.
+            throw new Error("세션 만료"); 
+
+        } catch (refreshError) {
+            // 3. 재발급도 실패하면? -> 진짜 로그아웃 (강제 청소)
+            console.log("세션이 만료되어 강제 로그아웃 됩니다.");
+            showToast("세션이 만료되었습니다. 다시 로그인해주세요.", "error");
+            
+            ['accessToken', 'refreshToken', 'myId'].forEach(key => {
+                localStorage.removeItem(key);
+                sessionStorage.removeItem(key);
+            });
+            
+            window.location.href = '/'; // 강제로 로그인 페이지로 이동
+            return Promise.reject(refreshError);
+        }
       }
       return Promise.reject(error);
     }

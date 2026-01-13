@@ -382,7 +382,7 @@ export default function WeatherDetail() {
             {processedHourly.map((hour, idx) => (
               <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '55px' }}>
                 <span style={{ fontSize: '14px', marginBottom: '8px', fontWeight: 500 }}>
-                    {hour.type === 'special' ? hour.sky : (idx === 0 ? '지금' : hour.time)}
+                    {hour.type === 'special' ? hour.sky : hour.time}
                 </span>
                 <div style={{ marginBottom: '8px' }}>
                     {getIcon(hour.sky, 30, hour.isNight)}
