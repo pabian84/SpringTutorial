@@ -117,7 +117,7 @@ public class UserService {
     /// [캐시 적용] 접속자 목록은 1분 동안 DB 조회 없이 캐시된 값 반환
     // 로그인/로그아웃 시 데이터가 변하더라도 1분 정도의 오차는 허용하거나, 
     // login/logout 메서드에 @CacheEvict(value = "online_users", allEntries = true)를 붙여서 즉시 갱신할 수도 있습니다.
-    //@Cacheable(value = "online_users") // [캐시 적용] 접속자 목록은 1분 동안 DB 조회 없이 캐시된 값 반환
+    @Cacheable(value = "online_users") // [캐시 적용] 접속자 목록은 1분 동안 DB 조회 없이 캐시된 값 반환
     public List<UserRes> getOnlineUserList() {
         List<User> userEntities = userMapper.findOnlineUsers();
         List<UserRes> result = new ArrayList<>();

@@ -1,10 +1,11 @@
 package com.example.demo.scheduler;
 
-import com.example.demo.handler.SystemStatusHandler;
+import java.lang.management.ManagementFactory;
+
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.lang.management.ManagementFactory;
+import com.example.demo.handler.SystemStatusHandler;
 import com.sun.management.OperatingSystemMXBean; // [중요] CPU 정보를 위해 필요
 
 @Component

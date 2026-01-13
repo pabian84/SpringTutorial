@@ -69,4 +69,4 @@ CREATE TABLE if not exists chat_log (
 -- INSERT INTO users (id, name, password, role) VALUES ('user3', '사용자3', '$2a$10$hjBO1B8SB4uKJpnSBk9vluUsMAxe44n7CAwQ4ijHOrAdWAwqMxo.e', 'USER');
 -- INSERT INTO users (id, name, password, role) VALUES ('user4', '사용자4', '$2a$10$hjBO1B8SB4uKJpnSBk9vluUsMAxe44n7CAwQ4ijHOrAdWAwqMxo.e', 'USER');
 -- INSERT INTO users (id, name, password, role) VALUES ('user5', '사용자5', '$2a$10$hjBO1B8SB4uKJpnSBk9vluUsMAxe44n7CAwQ4ijHOrAdWAwqMxo.e', 'USER');
-UPDATE users SET password = '$2a$10$hjBO1B8SB4uKJpnSBk9vluUsMAxe44n7CAwQ4ijHOrAdWAwqMxo.e'
+-- UPDATE users SET password = '$2a$10$hjBO1B8SB4uKJpnSBk9vluUsMAxe44n7CAwQ4ijHOrAdWAwqMxo.e'
