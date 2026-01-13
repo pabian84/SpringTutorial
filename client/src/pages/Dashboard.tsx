@@ -25,7 +25,7 @@ interface UserData {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const myId = localStorage.getItem('myId') || sessionStorage.getItem('myId');
+  const myId = localStorage.getItem('myId');
   // [수정] useState로 관리하던 위치 정보 삭제 -> 전역 Context 사용
   // 이제 Dashboard가 위치를 직접 찾지 않고, Context가 찾은 값을 받아오기만 합니다.
   const { lat, lon, loading: locLoading } = useUserLocation();
@@ -110,26 +110,19 @@ export default function Dashboard() {
   // 로그아웃 처리 함수
   const handleLogout = async () => {
     try {
-      // 1. 현재 저장된 토큰 찾기 (Local or Session)
-      const refreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
-      const myId = localStorage.getItem('myId') || sessionStorage.getItem('myId');
-
-      if (myId && refreshToken) {
-        // 2. 서버에 "이 기기 로그아웃 시켜줘" 요청
-        await axios.post('api/user/logout', { 
-            userId: myId,
-            refreshToken: refreshToken // [핵심] 이걸 보내야 DB에서 얘만 지움
-        });
+      const myId = localStorage.getItem('myId')
+      if (myId) {
+        // [수정] refreshToken 안 보냄 (쿠키로 감)
+        await axios.post('api/user/logout', { userId: myId });
       }
     } catch (e) {
       console.error("로그아웃 요청 실패:", e);
       showToast('Logout failed on server side(session expired)', 'error');
     } finally {
       // 3. 클라이언트 정보 삭제 (소켓도 여기서 끊김 -> UserConnectionHandler가 오프라인 처리함)
-      ['accessToken', 'refreshToken', 'myId'].forEach(key => {
-        localStorage.removeItem(key);
-        sessionStorage.removeItem(key);
-      });
+      // [수정] localStorage만 청소
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('myId');
       
       showToast('로그아웃 되었습니다.');
       navigate('/');

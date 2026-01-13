@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { showConfirm, showToast } from '../utils/Alert';
+import { showConfirm, showToast } from '../utils/alert';
 
 interface Memo {
   id: number;
@@ -13,7 +13,7 @@ export default function MemoWidget() {
   const [input, setInput] = useState('');
   
   // 로그인한 내 아이디 가져오기
-  const myId = localStorage.getItem('myId') || sessionStorage.getItem('myId');
+  const myId = localStorage.getItem('myId');
 
   useEffect(() => {
     if (!myId) {

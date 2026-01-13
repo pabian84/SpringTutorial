@@ -3,11 +3,14 @@ import { showToast } from './alert';
 
 // Axios 전역 설정
 export const setupAxiosInterceptors = () => {
+  // 기본 설정: 쿠키를 포함한 요청을 보내도록 설정
+  axios.defaults.withCredentials = true;
+
   // 1. 요청(Request) 챌 때마다 토큰 붙이기
   axios.interceptors.request.use(
     (config) => {
       // 로컬 또는 세션 스토리지 둘 다 확인
-      const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+      const token = localStorage.getItem('accessToken');
       if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
       }
@@ -42,10 +45,8 @@ export const setupAxiosInterceptors = () => {
             console.log("세션이 만료되어 강제 로그아웃 됩니다.");
             showToast("세션이 만료되었습니다. 다시 로그인해주세요.", "error");
             
-            ['accessToken', 'refreshToken', 'myId'].forEach(key => {
-                localStorage.removeItem(key);
-                sessionStorage.removeItem(key);
-            });
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('myId');
             
             window.location.href = '/'; // 강제로 로그인 페이지로 이동
             return Promise.reject(refreshError);

@@ -47,18 +47,23 @@ public class UserService {
             // 간단하게 파싱 (실무엔 라이브러리 사용 권장)
             String browser = "Unknown";
             String os = "Unknown";
-            if (userAgent.contains("Chrome")) browser = "Chrome";
-            else if (userAgent.contains("Safari")) browser = "Safari";
-            if (userAgent.contains("Windows")) os = "Windows";
-            else if (userAgent.contains("Mac")) os = "Mac";
+            if (userAgent != null) {
+                if (userAgent.contains("Chrome")) browser = "Chrome";
+                else if (userAgent.contains("Firefox")) browser = "Firefox";
+                else if (userAgent.contains("Safari")) browser = "Safari";
+                
+                if (userAgent.contains("Windows")) os = "Windows";
+                else if (userAgent.contains("Mac")) os = "Mac";
+                else if (userAgent.contains("Linux")) os = "Linux";
+            }
 
             // 7일 후 만료
             Timestamp expiry = new Timestamp(System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000));
+            // DB 저장
             userMapper.saveRefreshToken(user.getId(), refreshToken, ip, browser, os, expiry);
 
             // 4. 로그 및 상태 업데이트
             userMapper.updateStatus(user.getId(), true);
-            
             // 로그 저장 객체 생성
             AccessLog logData = AccessLog.builder()
                     .userId(user.getId())
@@ -71,6 +76,7 @@ public class UserService {
                     .build();
             userMapper.saveLog(logData);
 
+            // 컨트롤러에게 토큰을 넘겨줍니다.
             result.put("status", "ok");
             result.put("accessToken", accessToken);  // 프론트로 보냄
             result.put("refreshToken", refreshToken); // 프론트로 보냄
@@ -87,7 +93,9 @@ public class UserService {
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
     public void logout(String userId, String refreshToken) {
         // 1. DB에서 해당 기기의 리프레시 토큰만 삭제
-        userMapper.deleteRefreshToken(refreshToken);
+        if (refreshToken != null) {
+            userMapper.deleteRefreshToken(refreshToken);
+        }
         
         // [중요] 여기서 updateStatus(false)를 하지 않습니다!
         // 이유: PC에서 로그아웃했다고 해서, 핸드폰까지 오프라인 처리되면 안 되기 때문입니다.
@@ -105,9 +113,9 @@ public class UserService {
     // 로그아웃 처리 (모든 기기)
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
-    public void logout(String userId) {
-        userMapper.updateStatus(userId, false);
+    public void logoutAllDevices(String userId) {
         userMapper.deleteAllRefreshTokens(userId); // 토큰 삭제 (로그아웃 핵심)
+        userMapper.updateStatus(userId, false); // 상태 오프라인 처리
         
         // 로그 기록 (약식)
         AccessLog logData = AccessLog.builder()

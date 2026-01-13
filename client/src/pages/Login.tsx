@@ -13,35 +13,28 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); // form submit 시 페이지 새로고침 방지
     try {
-      const res = await axios.post('api/user/login', { id, password });
+      const res = await axios.post('api/user/login', {
+        id, password, isRememberMe: keepLogin
+      });
       
-      if (res.data.status === 'ok') {
-        const { accessToken, refreshToken, user } = res.data;
-        // 체크 여부에 따라 저장소 결정
-        const storage = keepLogin ? localStorage : sessionStorage;
+      const { status, message, user, accessToken } = res.data;
 
-        // 기존에 다른 저장소에 남아있을 수 있는 토큰 삭제 (충돌 방지)
-        ['accessToken', 'refreshToken', 'myId'].forEach(key => {
-            localStorage.removeItem(key);
-            sessionStorage.removeItem(key);
-        });
-
-        // 선택된 저장소에 저장
-        storage.setItem('accessToken', accessToken);
-        storage.setItem('refreshToken', refreshToken);
-        storage.setItem('myId', user.id);
+      if (status === 'ok') {
+        // [수정] AccessToken은 무조건 localStorage에 저장 (sessionStorage 안 씀)
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('myId', user.id);
         
         // 성공 시 가볍게 토스트 알림을 띄우고 이동
         showToast(`환영합니다, ${res.data.user.name}님!`, 'success');
         navigate('/dashboard');
       } else {
         // [변경] 실패 시 모달 창 띄우기
-        showAlert('로그인 실패', '아이디 또는 비밀번호를 확인해주세요.', 'error');
+        showAlert('로그인 실패', message, 'error');
       }
     } catch (e) {
       console.error(e);
       // [변경] 서버 에러
-      showAlert('오류 발생', '서버와 통신할 수 없습니다.', 'error');
+      showAlert('오류 발생', '로그인 중 문제가 발생했습니다.', 'error');
     }
   };
 

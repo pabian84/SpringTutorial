@@ -18,7 +18,7 @@ function AppContent() {
 
   useEffect(() => {
     // 1. 저장소에서 토큰 확인 (로그인 유지 체크했으면 local, 아니면 session에 있음)
-    const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+    const token = localStorage.getItem('accessToken');
     
     // 2. 토큰이 있고, 현재 페이지가 로그인 페이지('/')라면 -> 대시보드로 이동
     if (token && location.pathname === '/') {

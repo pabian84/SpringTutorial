@@ -7,7 +7,7 @@ export const useConnection = () => {
 
   useEffect(() => {
     // 1. 내 아이디 확인 (없으면 연결 안 함)
-    const myId = localStorage.getItem('myId') || sessionStorage.getItem('myId');
+    const myId = localStorage.getItem('myId');
     // 로그아웃 상태면 연결 끊기 (중요)
     if (!myId) {
       if (ws.current) {
