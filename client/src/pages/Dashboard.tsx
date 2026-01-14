@@ -35,7 +35,9 @@ export default function Dashboard() {
 
   // [1] 채팅 상태를 Dashboard에서 관리 (Lifting State Up)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const ws = useRef<WebSocket | null>(null);
+  // 소켓 객체들을 useRef로 관리 (생명주기 유지 및 상태 체크용)
+  const chatWs = useRef<WebSocket | null>(null);
+  const dashboardWs = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (!myId) {
@@ -54,27 +56,29 @@ export default function Dashboard() {
     // refetchInterval: 5000, // [삭제] 더 이상 5초마다 낭비하지 않음
   });
 
-  // [신규] 대시보드 상태 감지용 WebSocket (User Update 감지)
+  // 대시보드 상태 감지용 WebSocket (User Update 감지)
   useEffect(() => {
-    const dashboardWs = new WebSocket('ws://localhost:8080/ws/dashboard');
-
-    dashboardWs.onopen = () => console.log("대시보드 소켓 연결 성공");
-    
-    dashboardWs.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        // [핵심] 유저 변동 신호(USER_UPDATE)가 오면 목록 새로고침!
-        if (message.type === 'USER_UPDATE') {
-          queryClient.invalidateQueries({ queryKey: ['onlineUsers'] });
+    // 안전한 연결 조건: 소켓이 없거나, 완전히 닫혔을 때만 연결
+    if (!dashboardWs.current || dashboardWs.current.readyState === WebSocket.CLOSED) {
+      dashboardWs.current = new WebSocket('ws://localhost:8080/ws/dashboard');
+      dashboardWs.current.onopen = () => console.log("[Dashboard] 대시보드 소켓 연결 성공");
+      dashboardWs.current.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          // [핵심] 유저 변동 신호(USER_UPDATE)가 오면 목록 새로고침!
+          if (message.type === 'USER_UPDATE') {
+            queryClient.invalidateQueries({ queryKey: ['onlineUsers'] });
+          }
+        } catch (error) {
+          console.error("[Dashboard] Dashboard WS Parsing Error:", error);
         }
-      } catch (error) {
-        console.error("Dashboard WS Parsing Error:", error);
-      }
-    };
-
-    return () => {
-      dashboardWs.close();
-    };
+      };
+      dashboardWs.current.onerror = (error) => console.error('[Dashboard] WebSocket Error:', error);
+      dashboardWs.current.onclose = () => {
+        console.log('[Dashboard] 접속 모니터링 종료');
+        dashboardWs.current = null; // 끊기면 초기화
+      };
+    }
   }, [queryClient]);
 
   // 채팅 기록 불러오기 (React Query) -> DB에 저장된 이전 대화 로드
@@ -101,34 +105,62 @@ export default function Dashboard() {
 
   // Chatting WebSocket 연결 (Dashboard가 켜질 때 한 번만 연결)
   useEffect(() => {
-    ws.current = new WebSocket('ws://localhost:8080/ws/chat');
-    
-    ws.current.onopen = () => console.log("채팅 서버 연결 성공");
-    ws.current.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        // 메시지가 유효한 객체인지 확인 후 추가
-        if (data && typeof data === 'object') {
-          // 메시지 오면 리스트에 추가 (작은 창, 큰 창 모두 반영됨)
-          setChatMessages(prev => [...prev, data]);
+    // 이미 연결되어 있으면 패스 (중복 연결 방지)
+    if (chatWs.current && chatWs.current.readyState === WebSocket.OPEN) {
+      return;
+    }
+    // 안전한 연결 조건 적용
+    if (!chatWs.current || chatWs.current.readyState === WebSocket.CLOSED) {
+      chatWs.current = new WebSocket('ws://localhost:8080/ws/chat');
+      chatWs.current.onopen = () => console.log("[Chat] 채팅 서버 연결 성공");
+      chatWs.current.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          // 메시지가 유효한 객체인지 확인 후 추가
+          if (data && typeof data === 'object') {
+            // 메시지 오면 리스트에 추가 (작은 창, 큰 창 모두 반영됨)
+            setChatMessages(prev => [...prev, data]);
+          }
+        } catch (e) {
+          console.error("[Chat] 메시지 파싱 에러:", e);
         }
-      } catch (e) {
-        console.error("메시지 파싱 에러:", e);
-      }
-    };
+      };
+      chatWs.current.onerror = (error) => console.error('[Chat] WebSocket Error:', error);
+      chatWs.current.onclose = () => {
+        console.log('[Chat] 접속 모니터링 종료');
+        chatWs.current = null; // 끊기면 초기화
+      };
+    }
+  }, []);
 
+  useEffect(() => {
     return () => {
-      ws.current?.close();
+      // 컴포넌트 언마운트 시에만 닫기
+      if (dashboardWs.current) {
+        if (dashboardWs.current.readyState === WebSocket.OPEN) {
+          dashboardWs.current.onopen = null;
+          dashboardWs.current.onmessage = null;
+          dashboardWs.current.close();
+        }
+      }
+      if (chatWs.current) {
+        if (chatWs.current.readyState === WebSocket.OPEN) {
+          chatWs.current.onopen = null;
+          chatWs.current.onmessage = null;
+          chatWs.current.onerror = null;
+          chatWs.current.close();
+        }
+      }
     };
   }, []);
 
   // 메시지 전송 함수 (ChatWidget에게 전달할 함수)
   const handleSendMessage = (text: string) => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN && myId) {
+    if (chatWs.current && chatWs.current.readyState === WebSocket.OPEN && myId) {
       const msgData = { sender: myId, text: text };
-      ws.current.send(JSON.stringify(msgData));
+      chatWs.current.send(JSON.stringify(msgData));
     } else {
-        console.error("채팅 서버가 연결되지 않았습니다.");
+        console.error("[Chat] 채팅 서버가 연결되지 않았습니다.");
     }
   };
 

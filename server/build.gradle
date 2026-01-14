@@ -26,6 +26,8 @@ dependencies {
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
     // Caffeine 캐시 라이브러리 추가
     implementation 'com.github.ben-manes.caffeine:caffeine'
+    // 하드웨어 정보 조회 Operation Systeim & Hardware Information
+    implementation 'com.github.oshi:oshi-core:6.9.2'
     // JWT (출입증 발급기) - 최신 버전(0.12.x) 사용
     implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
