@@ -13,7 +13,7 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); // form submit 시 페이지 새로고침 방지
     try {
-      const res = await axios.post('api/user/login', {
+      const res = await axios.post('/api/user/login', {
         id, password, isRememberMe: keepLogin
       });
       

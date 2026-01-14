@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'; // 임포트 필수
 import axios from 'axios';
-import type {  WeatherData } from '../types/weather';
+import type { WeatherDTO } from '../types/dtos';
 
 // 이제 위치 정보는 밖에서 받아옵니다. (위치 추적 로직 삭제됨)
 export const useWeather = (lat: number | null, lon: number | null) => {
@@ -8,7 +8,7 @@ export const useWeather = (lat: number | null, lon: number | null) => {
     queryKey: ['weather', lat, lon], // 좌표가 바뀌면 캐시 갱신
     queryFn: async () => {
       if (!lat || !lon) return null; 
-      const res = await axios.get<WeatherData>(`http://localhost:8080/api/weather?lat=${lat}&lon=${lon}`);
+      const res = await axios.get<WeatherDTO>(`/api/weather?lat=${lat}&lon=${lon}`);
       return res.data;
     },
     enabled: !!lat && !!lon, // 좌표가 있을 때만 실행

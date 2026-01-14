@@ -1,22 +1,15 @@
-import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-
-// 서버에서 받아올 데이터 타입 정의 (DTO와 일치시킴)
-interface StockRes {
-  symbol: string;
-  name: string;
-  price: number;
-  change: number;
-}
+import { useEffect, useState } from 'react';
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import type { StockDTO } from '../types/dtos';
 
 export default function ExchangeWidget() {
-  const [data, setData] = useState<StockRes[]>([]);
+  const [data, setData] = useState<StockDTO[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // 스프링 서버 API 호출
-    axios.get<StockRes[]>('api/finance/dashboard')
+    axios.get<StockDTO[]>('/api/finance/dashboard')
       .then(res => {
         setData(res.data);
         setLoading(false);
@@ -64,7 +57,7 @@ export default function ExchangeWidget() {
             ]}
             />
             <Bar dataKey="price" radius={[4, 4, 0, 0]} barSize={40}>
-              {data.map((entry, index) => (
+              {data.map((_entry, index) => (
                 <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
             </Bar>

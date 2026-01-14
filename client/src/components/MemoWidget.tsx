@@ -1,15 +1,10 @@
-import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useEffect, useState } from 'react';
+import type { MemoDTO } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/alert';
 
-interface Memo {
-  id: number;
-  userId: string;
-  content: string;
-}
-
 export default function MemoWidget() {
-  const [memos, setMemos] = useState<Memo[]>([]);
+  const [memos, setMemos] = useState<MemoDTO[]>([]);
   const [input, setInput] = useState('');
   
   // 로그인한 내 아이디 가져오기
@@ -22,7 +17,7 @@ export default function MemoWidget() {
     // 메모 추가
     const fetchMemos = async () => {
       try {
-        const res = await axios.get(`http://localhost:8080/api/memo/${myId}`);
+        const res = await axios.get(`/api/memo/${myId}`);
         setMemos(res.data);
       } catch (e) {
         console.error("메모 로딩 실패", e);
@@ -38,7 +33,7 @@ export default function MemoWidget() {
     if (!input.trim() || !myId) return;
     
     // [수정] userId를 같이 전송
-    await axios.post('http://localhost:8080/api/memo', { 
+    await axios.post('/api/memo', { 
       userId: myId,
       content: input 
     });
@@ -46,7 +41,7 @@ export default function MemoWidget() {
     setInput('');
     // 목록 갱신 (코드가 중복되지만, 안전을 위해 직접 호출)
     // 간단하게 목록만 다시 불러오기 위해 axios를 한번 더 씁니다.
-    const res = await axios.get(`http://localhost:8080/api/memo/${myId}`);
+    const res = await axios.get(`/api/memo/${myId}`);
     setMemos(res.data);
   };
 
@@ -55,14 +50,14 @@ export default function MemoWidget() {
     // yes 클릭 시 삭제 진행
     if (result.isConfirmed) {
       try {
-        await axios.delete(`http://localhost:8080/api/memo/${id}`);
+        await axios.delete(`/api/memo/${id}`);
 
         // 삭제 성공 후 토스트 알림
         showToast('메모가 삭제되었습니다.', 'success');
         
         // 목록 갱신
         if (myId) {
-            const res = await axios.get(`http://localhost:8080/api/memo/${myId}`);
+            const res = await axios.get(`/api/memo/${myId}`);
             setMemos(res.data);
         }
       } catch (e) {

@@ -1,26 +1,18 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useEffect, useState } from 'react';
+import { FaChrome, FaDesktop, FaEdge, FaFirefox, FaMobileAlt, FaQuestionCircle, FaSafari } from 'react-icons/fa';
+import { useNavigate, useParams } from 'react-router-dom';
+import type { AccessLogDTO } from '../types/dtos';
 import { showAlert } from '../utils/alert';
-import { FaDesktop, FaMobileAlt, FaChrome, FaEdge, FaSafari, FaFirefox, FaQuestionCircle } from 'react-icons/fa';
-
-interface LogData {
-  seq: number;
-  type: string;
-  logTime: string;
-  ipAddress: string; // [추가]
-  browser: string;   // [추가]
-  os: string;        // [추가]
-}
 
 export default function UserDetail() {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const [logs, setLogs] = useState<LogData[]>([]);
+  const [logs, setLogs] = useState<AccessLogDTO[]>([]);
 
   useEffect(() => {
     // API 호출
-    axios.get(`http://localhost:8080/api/user/logs/${userId}`)
+    axios.get(`/api/user/logs/${userId}`)
          .then(res => {
             setLogs(res.data);
          })

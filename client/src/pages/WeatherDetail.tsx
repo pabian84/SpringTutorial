@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUserLocation } from '../contexts/UserLocationContext';
 import { useWeather } from '../hooks/useWeather';
 import { useWeatherFormatter } from '../hooks/useWeatherFormatter';
-import type { WeatherData } from '../types/weather';
+import type { WeatherDTO } from '../types/dtos';
 
 // --- 인터페이스 정의 ---
 interface DetailBoxProps {
@@ -295,7 +295,7 @@ const getBackgroundIcon = (sky: string, isNight: boolean, sunrise: string, sunse
   }
 };
 
-const getDetailContent = (id: string, w: WeatherData) => {
+const getDetailContent = (id: string, w: WeatherDTO) => {
     switch (id) {
       case 'uv': return { title: '자외선 지수', val: w.uvIndex, desc: '오늘 자외선 수치입니다.', icon: <IoSunny /> };
       case 'sunset': return { title: '일몰', val: w.sunset, desc: `일출 시간은 ${w.sunrise}입니다.`, icon: <IoTime /> };

@@ -1,14 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
-
-export interface ChatMessage {
-  sender: string;
-  text: string;
-  createdAt?: string; // 없을 수도 있으니 옵셔널(?), 하지만 이제 서버가 보내줌
-}
+import type { ChatHistoryDTO } from '../types/dtos';
 
 interface ChatWidgetProps {
   myId: string;
-  messages: ChatMessage[];
+  messages: ChatHistoryDTO[];
   onSendMessage: (text: string) => void;
 }
 

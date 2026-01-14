@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
-import type { WeatherData } from '../types/weather';
+import type { WeatherDTO } from '../types/dtos';
 import { checkIsNight } from '../utils/WeatherUtils'; // 기존 utils 활용
 
-export const useWeatherFormatter = (weather: WeatherData | null, visibleCount: number = 6) => {
-  
+export const useWeatherFormatter = (weather: WeatherDTO | null, visibleCount: number = 6) => {
   // 1. 현재 밤/낮 여부 계산
   const isCurrentNight = useMemo(() => {
     if (!weather) return false;

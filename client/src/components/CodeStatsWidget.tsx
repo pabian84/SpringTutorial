@@ -13,7 +13,7 @@ export default function CodeStatsWidget() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get<Record<string, number>>('http://localhost:8080/api/stats/code')
+    axios.get<Record<string, number>>('/api/stats/code')
       .then(res => {
         // Map 데이터를 배열로 변환
         const chartData = Object.entries(res.data).map(([name, value]) => ({
@@ -50,7 +50,7 @@ export default function CodeStatsWidget() {
             paddingAngle={5}
             dataKey="value"
           >
-            {data.map((entry, index) => (
+            {data.map((_entry, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>

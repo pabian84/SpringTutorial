@@ -1,25 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import type { SystemStatusDTO } from '../types/dtos';
 import { showToast } from '../utils/alert';
-
-interface SystemData {
-  time: string;
-  cpu: number;
-  cpuPercent: number;
-  memory: number;
-  memoryPercent: number;
-}
 
 const MAX_DATA_POINTS = 20;
 const INITIAL_DATA = Array(MAX_DATA_POINTS).fill({ 
+  type: 'SYSTEM_STATUS',
   time: '', 
   cpu: 0, 
   cpuPercent: 0, 
   memory: 0, 
   memoryPercent: 0 
 });
+const WS_URL = import.meta.env.VITE_WS_URL;
+
 export default function ServerMonitor() {
-  const [systemData, setSystemData] = useState<SystemData[]>(INITIAL_DATA);
+  const [systemData, setSystemData] = useState<SystemStatusDTO[]>(INITIAL_DATA);
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -30,7 +26,7 @@ export default function ServerMonitor() {
     // 1. 웹소켓 연결
     // (이전 소켓이 닫히는 중이거나 닫혀있으면 새로 연결)
     if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
-      ws.current = new WebSocket('ws://localhost:8080/ws/dashboard');
+      ws.current = new WebSocket(`${WS_URL}/ws/dashboard`);
       ws.current.onopen = () => console.log('서버 모니터링 연결 성공');
       ws.current.onmessage = (event) => {
         try {
@@ -47,6 +43,7 @@ export default function ServerMonitor() {
             });
 
             // [수정 2] 확실하게 숫자로 변환 (안전장치)
+            const type = message.type;
             const time = message.time ? message.time : timeStr;
             const cpu = Number(message.cpu);
             const cpuPercent = Number(message.cpuPercent);
@@ -64,6 +61,7 @@ export default function ServerMonitor() {
             // 3. 차트 데이터 업데이트 (최근 20개만 유지)
             setSystemData(prev => {
               const newData = { 
+                type: type,
                 time: time,
                 cpu: cpu,
                 cpuPercent: cpuPercent,
