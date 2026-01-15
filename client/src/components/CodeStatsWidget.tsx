@@ -1,14 +1,27 @@
-import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { useEffect, useState } from 'react';
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
-interface CodeData {
+// 언어별 브랜드 컬러 (Java:빨강, TS:파랑, CSS:하늘색, 기타:회색)
+const COLORS = ['#ea2d2e', '#3178c6', '#2965f1', '#999999'];
+
+// 외부에서 사용할 수 있도록 export
+export interface CodeData {
   name: string;
   value: number;
   [key: string]: string | number;
 }
+interface ChartProps {
+  data: CodeData[];
+}
 
-export default function CodeStatsWidget() {
+// [대시보드용] 부모에게 데이터를 받아서 렌더링 (Dumb Component)
+export default function CodeStatsWidget({ data }: ChartProps) {
+  return <CodeStatsChart data={data} />;
+}
+
+// [독립 실행형] 자체적으로 데이터 로딩 후 렌더링 (Standalone Component)
+export function StrandaloneCodeStatsWidget() {
   const [data, setData] = useState<CodeData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,11 +45,13 @@ export default function CodeStatsWidget() {
       });
   }, []);
 
-  // 언어별 브랜드 컬러 (Java:빨강, TS:파랑, CSS:하늘색, 기타:회색)
-  const COLORS = ['#ea2d2e', '#3178c6', '#2965f1', '#999999'];
-
   if (loading) return <div style={{ color: '#aaa', textAlign: 'center', lineHeight: '250px' }}>소스코드 분석 중...</div>;
 
+  return <CodeStatsChart data={data} />;
+}
+
+// [공통] 차트 렌더링 전용 컴포넌트
+function CodeStatsChart({ data }: ChartProps) {
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -49,6 +64,7 @@ export default function CodeStatsWidget() {
             outerRadius={80}
             paddingAngle={5}
             dataKey="value"
+            isAnimationActive={true}
           >
             {data.map((_entry, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

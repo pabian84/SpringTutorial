@@ -65,7 +65,9 @@ public class CodeStatsService {
     private boolean isSourceCode(Path path) {
         String p = path.toString();
         // 제외할 폴더들 (이거 안 빼면 node_modules 때문에 수십만 줄 나옴)
-        if (p.contains("node_modules") || p.contains(".git") || p.contains("build") || p.contains("dist") || p.contains("bin") || p.contains(".gradle")) {
+        if (p.contains("node_modules") || p.contains(".git") || p.contains("build") || p.contains("dist") || p.contains("bin")
+            || p.contains(".gradle") || p.contains(".idea") || p.contains(".vscode") || p.contains("out")
+        ) {
             return false;
         }
         // 포함할 확장자

@@ -3,7 +3,18 @@ import { useEffect, useState } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { StockDTO } from '../types/dtos';
 
-export default function ExchangeWidget() {
+// 차트 색상 (미국: 파랑, 일본: 빨강, 유럽: 노랑/주황)
+const COLORS = ['#3b82f6', '#ef4444', '#f59e0b'];
+
+interface ChartProps {
+  data: StockDTO[];
+}
+
+export default function ExchangeWidget({ data }: ChartProps) {
+  return <ExchangeChart data={data} />;
+}
+
+export function StandaloneExchangeWidget() {
   const [data, setData] = useState<StockDTO[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,13 +31,15 @@ export default function ExchangeWidget() {
       });
   }, []);
 
-  // 차트 막대 색상 (미국: 파랑, 일본: 빨강, 유럽: 노랑/주황)
-  const colors = ['#3b82f6', '#ef4444', '#f59e0b'];
-
   if (loading) {
     return <div style={{ color: '#aaa', textAlign: 'center', lineHeight: '250px' }}>데이터 로딩 중...</div>;
   }
 
+  return <ExchangeChart data={data} />;
+}
+
+// 3. [공통] 차트 렌더링 전용 컴포넌트
+function ExchangeChart({ data }: ChartProps) {
   return (
     <div style={{ width: '100%', height: '100%' }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -58,7 +71,7 @@ export default function ExchangeWidget() {
             />
             <Bar dataKey="price" radius={[4, 4, 0, 0]} barSize={40}>
               {data.map((_entry, index) => (
-                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Bar>
           </BarChart>

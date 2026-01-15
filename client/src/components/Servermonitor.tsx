@@ -14,7 +14,16 @@ const INITIAL_DATA = Array(MAX_DATA_POINTS).fill({
 });
 const WS_URL = import.meta.env.VITE_WS_URL;
 
-export default function ServerMonitor() {
+interface ChartProps {
+  data: SystemStatusDTO[];
+}
+
+// 부모에게 데이터 받아서 렌더링 전용 컴포넌트
+export default function ServerMonitor({ data }: ChartProps) {
+  return <ServerStatusChart data={data} />;
+}
+
+export function StandaloneServerMonitor() {
   const [systemData, setSystemData] = useState<SystemStatusDTO[]>(INITIAL_DATA);
   const ws = useRef<WebSocket | null>(null);
 
@@ -96,24 +105,48 @@ export default function ServerMonitor() {
     };
   }, []);
 
+  // UI는 공통 컴포넌트에 위임
+  return <ServerStatusChart data={systemData} />;
+}
+
+// 차트 렌더링 전용 컴포넌트
+function ServerStatusChart({ data }: ChartProps) {
   return (
     <div style={{ width: '100%', height: '100%' }}>
-      {/* 반응형 차트 컨테이너 */}
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={systemData}>
+        <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-          <XAxis stroke="#aaa" fontSize={12} tick={{fill: '#aaa'}} tickFormatter={(index) => systemData[index]?.time ?? ''} />
-          <YAxis domain={[0, 100]} stroke="#aaa" fontSize={12} tick={{fill: '#aaa'}} />
-          <Tooltip 
-            contentStyle={{ backgroundColor: '#16213e', border: '1px solid #444' }} 
-            itemStyle={{ color: '#fff' }}
-            // [수정 3] 소수점 2자리로 깔끔하게 표시
-            formatter={(value: number | undefined ) => value?.toFixed(2)}
+          <XAxis
+            stroke="#aaa"
+            fontSize={12}
+            tick={{ fill: '#aaa' }}
+            tickFormatter={(index) => data[index]?.time ?? ''}
+            interval="preserveStartEnd"
           />
-          {/* CPU 라인 (빨간색) */}
-          <Line type="monotone" dataKey="cpuPercent" stroke="#e94560" strokeWidth={2} dot={false} isAnimationActive={true} name="CPU 점유율(%)" />
-          {/* 메모리 라인 (파란색) */}
-          <Line type="monotone" dataKey="memoryPercent" stroke="#0f3460" strokeWidth={2} dot={false} isAnimationActive={true} name="RAM 사용량(%)" />
+          <YAxis domain={[0, 100]} stroke="#aaa" fontSize={12} tick={{ fill: '#aaa' }} />
+          <Tooltip
+            contentStyle={{ backgroundColor: '#16213e', border: '1px solid #444' }}
+            itemStyle={{ color: '#fff' }}
+            formatter={(value: number | undefined) => value?.toFixed(2)}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="cpuPercent" 
+            stroke="#e94560" 
+            strokeWidth={2} 
+            dot={false} 
+            isAnimationActive={false} 
+            name="CPU (%)" 
+          />
+          <Line 
+            type="monotone" 
+            dataKey="memoryPercent" 
+            stroke="#0f3460" 
+            strokeWidth={2} 
+            dot={false} 
+            isAnimationActive={false} 
+            name="RAM (%)" 
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>
