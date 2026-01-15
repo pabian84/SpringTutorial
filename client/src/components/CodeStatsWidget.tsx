@@ -60,8 +60,8 @@ function CodeStatsChart({ data }: ChartProps) {
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={60}
-            outerRadius={80}
+            innerRadius="60%" // 고정 픽셀(60) -> 퍼센트("60%")로 변경하여 반응형 적용
+            outerRadius="80%" // 고정 픽셀(80) -> 퍼센트("80%")로 변경하여 반응형 적용
             paddingAngle={5}
             dataKey="value"
             isAnimationActive={true}
