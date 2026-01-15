@@ -7,6 +7,8 @@ import java.util.Map;
 public class WeatherRes {
     private String location;
 
+    private Double maxTemp;
+    private Double minTemp;
     private Double currentTemp;
     private String currentSky;
     private double feelsLike;

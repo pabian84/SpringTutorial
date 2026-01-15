@@ -3,12 +3,12 @@ import axios from 'axios';
 import type { WeatherDTO } from '../types/dtos';
 
 // 이제 위치 정보는 밖에서 받아옵니다. (위치 추적 로직 삭제됨)
-export const useWeather = (lat: number | null, lon: number | null) => {
+export const useWeather = (lat: number | null, lon: number | null, hourlyLimit: number = 26, includeWeekly: boolean = true) => {
   const { data: weather, isLoading, error } = useQuery({
     queryKey: ['weather', lat, lon], // 좌표가 바뀌면 캐시 갱신
     queryFn: async () => {
       if (!lat || !lon) return null; 
-      const res = await axios.get<WeatherDTO>(`/api/weather?lat=${lat}&lon=${lon}`);
+      const res = await axios.get<WeatherDTO>(`/api/weather?lat=${lat}&lon=${lon}&hourlyLimit=${hourlyLimit}&includeWeekly=${includeWeekly}`);
       return res.data;
     },
     enabled: !!lat && !!lon, // 좌표가 있을 때만 실행

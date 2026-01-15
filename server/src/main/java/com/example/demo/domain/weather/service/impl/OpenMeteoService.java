@@ -1,10 +1,18 @@
 package com.example.demo.domain.weather.service.impl;
 
-import com.example.demo.domain.weather.dto.WeatherRes;
-import com.example.demo.domain.weather.service.WeatherProvider;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -12,12 +20,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import lombok.extern.slf4j.Slf4j;
+import com.example.demo.domain.weather.dto.WeatherRes;
+import com.example.demo.domain.weather.service.WeatherProvider;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -30,11 +36,23 @@ public class OpenMeteoService implements WeatherProvider {
     }
 
     @Override
-    // [추가] "weather"라는 이름의 캐시에 저장. lat, lon이 같으면 캐시된 데이터 반환
+    // [캐시] "weather"라는 이름의 캐시에 저장. lat, lon이 같으면 캐시된 데이터 반환
     @Cacheable(value = "weather", key = "#lat + '-' + #lon")
     public WeatherRes getWeather(double lat, double lon) {
+        // 상세 페이지: 시간별 26개(약 24시간), 주간예보 포함(true)
+        return getWeather(lat, lon, 26, true);
+    }
 
-        log.info("========== [DB Query] No cache found. Fetching data from DB! lat: {}, lon: {} ==========", lat, lon);
+    @Override
+    // [캐시] "weather"라는 이름의 캐시에 저장. lat, lon이 같으면 캐시된 데이터 반환
+    @Cacheable(value = "weather", key = "#lat + '-' + #lon + '-' + #hourlyLimit + '-' + #includeWeekly")
+    public WeatherRes getWeather(double lat, double lon, int hourlyLimit, boolean includeWeekly) {
+        return getWeatherImp(lat, lon, hourlyLimit, includeWeekly);
+    }
+
+    private WeatherRes getWeatherImp(double lat, double lon, int hourlyLimit, boolean includeWeekly) {
+
+        log.info("========== [DB Query] Fetching data! lat: {}, lon: {}, limit: {}, weekly: {} ==========", lat, lon, hourlyLimit, includeWeekly);
 
         // 1. 날씨 데이터 가져오기 (Open-Meteo)
         String url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat
@@ -43,8 +61,8 @@ public class OpenMeteoService implements WeatherProvider {
                 + "&hourly=temperature_2m,weather_code,precipitation_probability"
                 + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max"
                 + "&timezone=auto&forecast_days=7";
-        
-        Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+
+        Map<String, Object> response = safeCast(restTemplate.getForObject(url, Map.class), String.class, Object.class);
 
         // 데이터 파싱 (복잡한 로직은 Service에 숨김)
         WeatherRes res = new WeatherRes();
@@ -59,10 +77,25 @@ public class OpenMeteoService implements WeatherProvider {
             headers.add("User-Agent", "SpringTutorialApp/1.0"); // 앱 이름 임의 지정
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            ResponseEntity<Map> geoResponse = restTemplate.exchange(geoUrl, HttpMethod.GET, entity, Map.class);
-            Map<String, Object> addressMap = (Map<String, Object>) geoResponse.getBody().get("address");
+            //ResponseEntity<Map> geoResponse = restTemplate.exchange(geoUrl, HttpMethod.GET, entity, Map.class);
+            // [경고 해결] 명확한 타입 지정 (Raw Type 경고 제거)
+            ResponseEntity<Map<String, Object>> geoResponse = restTemplate.exchange(
+                geoUrl, 
+                Objects.requireNonNull(HttpMethod.GET),
+                entity, 
+                new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
+            // [경고 해결] Null Pointer Access 방지
+            Map<String, Object> body = geoResponse.getBody();
+            Map<String, Object> addressMap;
+            
+            if (body != null) {
+                addressMap = safeCast(body.get("address"), String.class, Object.class);
+            } else {
+                addressMap = new HashMap<>();
+            }
 
-            if (addressMap != null) {
+            if (!addressMap.isEmpty()) {
                 // 시, 도, 구 중 존재하는 값 조합
                 String city = (String) addressMap.getOrDefault("city", "");
                 String province = (String) addressMap.getOrDefault("province", "");
@@ -88,28 +121,32 @@ public class OpenMeteoService implements WeatherProvider {
         } catch (Exception e) {
             // API 실패 시 기본값
             res.setLocation("위치 확인 불가");
-            System.out.println("Geocoding error: " + e.getMessage());
+            log.error("Geocoding error: ", e);
         }
 
         // 1. 현재 날씨 파싱
-        Map<String, Object> current = (Map<String, Object>) response.get("current");
-        Map<String, Object> daily = (Map<String, Object>) response.get("daily");
+        Map<String, Object> current = safeCast(response.get("current"), String.class, Object.class);
+        Map<String, Object> daily = safeCast(response.get("daily"), String.class, Object.class);
+        Map<String, Object> hourly = safeCast(response.get("hourly"), String.class, Object.class);
 
-        // 일출/일몰 정보를 먼저 가져와야 현재 상태 판단 가능
+        // 일출/일몰 리스트를 여기서 딱 한 번만 만듭니다.
+        List<String> sunrises = new ArrayList<>();
+        List<String> sunsets = new ArrayList<>();
+        if (!daily.isEmpty()) {
+            sunrises = safeCast(daily.get("sunrise"), String.class);
+            sunsets = safeCast(daily.get("sunset"), String.class);
+        }
         String todaySunrise = null;
         String todaySunset = null;
-        if (daily != null) {
-            List<String> sunrises = (List<String>) daily.get("sunrise");
-            List<String> sunsets = (List<String>) daily.get("sunset");
-
-            // 오늘 날짜(0번 인덱스)의 일출/일몰 시간 가져오기 (ISO 포맷: 2024-01-08T07:12)
-            if (sunrises != null && !sunrises.isEmpty())
-                todaySunrise = sunrises.get(0);
-            if (sunsets != null && !sunsets.isEmpty())
-                todaySunset = sunsets.get(0);
+        if (!sunrises.isEmpty()) {
+            todaySunrise = sunrises.get(0);
         }
+        if (!sunsets.isEmpty()) {
+            todaySunset = sunsets.get(0);
+        }
+
         // 현재 날씨 상세정보 설정
-        if (current != null) {
+        if (!current.isEmpty()) {
             res.setCurrentTemp(Double.parseDouble(current.get("temperature_2m").toString()));
             res.setFeelsLike(Double.parseDouble(current.get("apparent_temperature").toString()));
             res.setHumidity(Double.parseDouble(current.get("relative_humidity_2m").toString()));
@@ -121,23 +158,18 @@ public class OpenMeteoService implements WeatherProvider {
             if (todaySunrise != null && todaySunset != null) {
                 // Timezone 정보 가져오기 (없으면 UTC)
                 String timezoneStr = (String) response.get("timezone");
-                if (timezoneStr == null)
+                if (timezoneStr == null) {
                     timezoneStr = "UTC";
+                }
                 skyStatus = determineSkyStatus(skyStatus, todaySunrise, todaySunset, timezoneStr);
             }
             res.setCurrentSky(skyStatus);
         }
 
-        // [일출/일몰] 데이터 추출을 위한 리스트 초기화
-        List<String> sunrises = new ArrayList<>();
-        List<String> sunsets = new ArrayList<>();
-
         // 2. Daily 데이터에서 오늘치 UV, 강수확률, 일출일몰 가져오기
-        if (daily != null) {
-            List<Double> uvs = (List<Double>) daily.get("uv_index_max");
-            List<Integer> rains = (List<Integer>) daily.get("precipitation_probability_max");
-            sunrises = (List<String>) daily.get("sunrise");
-            sunsets = (List<String>) daily.get("sunset");
+        if (!daily.isEmpty()) {
+            List<Double> uvs = safeCast(daily.get("uv_index_max"), Double.class);
+            List<Integer> rains = safeCast(daily.get("precipitation_probability_max"), Integer.class);
 
             if (!uvs.isEmpty()) {
                 res.setUvIndex(uvs.get(0).intValue());
@@ -156,12 +188,11 @@ public class OpenMeteoService implements WeatherProvider {
         }
 
         // 3. 시간대별 예보 (Hourly) + 일출/일몰
-        Map<String, Object> hourly = (Map<String, Object>) response.get("hourly");
         List<Map<String, Object>> combinedList = new ArrayList<>();
-        if (hourly != null) {
-            List<String> times = (List<String>) hourly.get("time");
-            List<Double> temps = (List<Double>) hourly.get("temperature_2m");
-            List<Integer> codes = (List<Integer>) hourly.get("weather_code");
+        if (!hourly.isEmpty()) {
+            List<String> times = safeCast(hourly.get("time"), String.class);
+            List<Double> temps = safeCast(hourly.get("temperature_2m"), Double.class);
+            List<Integer> codes = safeCast(hourly.get("weather_code"), Integer.class);
 
             // (1) 일반 시간대별 예보 데이터 추가
             for (int i = 0; i < times.size(); i++) {
@@ -178,7 +209,7 @@ public class OpenMeteoService implements WeatherProvider {
             }
 
             // (2) 일출 데이터 리스트에 끼워넣기
-            if (sunrises != null) {
+            if (!sunrises.isEmpty()) {
                 for (String s : sunrises) {
                     if (s == null) {
                         continue;
@@ -194,7 +225,7 @@ public class OpenMeteoService implements WeatherProvider {
             }
 
             // (3) 일몰 데이터 리스트에 끼워넣기
-            if (sunsets != null) {
+            if (!sunsets.isEmpty()) {
                 for (String s : sunsets) {
                     if (s == null) {
                         continue;
@@ -251,8 +282,8 @@ public class OpenMeteoService implements WeatherProvider {
                     finalHourlyList.add(item);
                 }
 
-                // 프론트엔드 성능을 위해 너무 많은 데이터는 자름 (26개 정도면 24시간+@ 커버)
-                if (finalHourlyList.size() >= 26) {
+                // 프론트엔드 성능을 위해 너무 많은 데이터는 hourlyLimit 자름 (26개 정도면 24시간+@ 커버)
+                if (finalHourlyList.size() >= hourlyLimit) {
                     break;
                 }
             }
@@ -261,13 +292,12 @@ public class OpenMeteoService implements WeatherProvider {
 
         // 4. 주간 예보 (Daily)
         List<Map<String, Object>> weekly = new ArrayList<>();
-        if (daily != null) {
-            List<String> times = (List<String>) daily.get("time");
-            List<Double> maxTemps = (List<Double>) daily.get("temperature_2m_max");
-            List<Double> minTemps = (List<Double>) daily.get("temperature_2m_min");
-            List<Integer> codes = (List<Integer>) daily.get("weather_code");
-            List<Integer> rainProbs = (List<Integer>) daily.get("precipitation_probability_max"); // 강수확률 추가
-
+        if (includeWeekly && !daily.isEmpty()) {
+            List<String> times = safeCast(daily.get("time"), String.class);
+            List<Double> maxTemps = safeCast(daily.get("temperature_2m_max"), Double.class);
+            List<Double> minTemps = safeCast(daily.get("temperature_2m_min"), Double.class);
+            List<Integer> codes = safeCast(daily.get("weather_code"), Integer.class);
+            List<Integer> rainProbs = safeCast(daily.get("precipitation_probability_max"), Integer.class); // 강수확률 추가
             // 최대 7일치 데이터 반복
             for (int i = 0; i < Math.min(7, times.size()); i++) {
                 Map<String, Object> day = new HashMap<>();
@@ -324,13 +354,13 @@ public class OpenMeteoService implements WeatherProvider {
 
             // 1. 일출 구간 (앞뒤 15분)
             if (isWithinRange(now, sunrise, 15)) {
-                System.out.println("일출 구간 감지: " + now + " / " + sunrise);
+                log.info("일출 구간 감지: " + now + " / " + sunrise);
                 return "일출(" + sunrise.toString().substring(11, 16) + ")"; // 일출 상태 반환
             }
 
             // 2. 일몰 구간 (앞뒤 15분)
             if (isWithinRange(now, sunset, 15)) {
-                System.out.println("일몰 구간 감지: " + now + " / " + sunset);
+                log.info("일몰 구간 감지: " + now + " / " + sunset);
                 return "일몰(" + sunset.toString().substring(11, 16) + ")"; // 일몰 상태 반환
             }
 
@@ -350,5 +380,36 @@ public class OpenMeteoService implements WeatherProvider {
         // isAfter/isBefore는 경계값을 포함하지 않으므로 정확하게는 >=, <= 처리가 필요할 수 있으나
         // 1분 단위 비교에서는 큰 문제 없음.
         return now.isAfter(start) && now.isBefore(end);
+    }
+
+    /**
+     * List 안전 변환 (Safe Cast)
+     * 사용법: List<String> list = safeCast(rawData, String.class);
+     */
+    private <T> List<T> safeCast(Object obj, Class<T> clazz) {
+        if (obj instanceof List<?> list) {
+            return list.stream()
+                    .filter(clazz::isInstance) // 타입 안 맞으면 버림 (안전성 확보)
+                    .map(clazz::cast)
+                    .toList(); // Java 16+
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Map 안전 변환 (Safe Cast)
+     * 사용법: Map<String, Object> map = safeCast(rawData, String.class, Object.class);
+     */
+    private <K, V> Map<K, V> safeCast(Object obj, Class<K> keyClass, Class<V> valueClass) {
+        Map<K, V> result = new HashMap<>();
+        if (obj instanceof Map<?, ?> map) {
+            map.forEach((k, v) -> {
+                // Key와 Value가 모두 내가 원하는 타입일 때만 담는다.
+                if (keyClass.isInstance(k) && valueClass.isInstance(v)) {
+                    result.put(keyClass.cast(k), valueClass.cast(v));
+                }
+            });
+        }
+        return result;
     }
 }

@@ -58,7 +58,7 @@ export default function WeatherWidget() {
   const [isReady, setIsReady] = useState(false);
 
   const { lat, lon, loading: locLoading, error: locError } = useUserLocation();
-  const { weather, loading: weatherLoading, error: weatherError } = useWeather(lat, lon);
+  const { weather, loading: weatherLoading, error: weatherError } = useWeather(lat, lon, 16, true);
   const { isCurrentNight, processedHourly } = useWeatherFormatter(weather, visibleCount);
 
   useLayoutEffect(() => {

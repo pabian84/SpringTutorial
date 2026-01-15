@@ -37,7 +37,9 @@ export interface StockDTO {
 // 4. WeatherRes.java 대응 (WeatherWidget용)
 export interface WeatherDTO {
   location: string;
-  
+
+  maxTemp: number;
+  minTemp: number;
   currentTemp: number;
   currentSky: string;
   feelsLike: number;

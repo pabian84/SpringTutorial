@@ -1,19 +1,16 @@
 package com.example.demo.global.config;
 
-// [중요] 이 Import들이 없으면 오류가 납니다.
-import com.github.benmanes.caffeine.cache.Caffeine;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
-import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
-import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+// [중요] 이 Import들이 없으면 오류가 납니다.
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 @Configuration
 @EnableCaching // 캐시 기능 활성화
@@ -24,10 +21,12 @@ public class CacheConfig {
         // 1. 동적 캐시 생성을 지원하는 매니저 생성
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
 
-        // 2. [Default 설정] Enum에 정의되지 않은 이름이 들어오면 이 설정을 따름 (switch의 default 역할)
-        cacheManager.setCaffeine(Caffeine.newBuilder()
+        Caffeine<Object, Object> defaultCaffeine = Caffeine.newBuilder()
                 .expireAfterWrite(5, TimeUnit.MINUTES) // 기본 5분
-                .maximumSize(50));                     // 기본 50개
+                .maximumSize(50);  // 기본 50개
+        // 2. [Default 설정] Enum에 정의되지 않은 이름이 들어오면 이 설정을 따름 (switch의 default 역할)
+        // Objects.requireNonNull을 사용하여 @NonNull 타입으로 변환
+        cacheManager.setCaffeine(Objects.requireNonNull(defaultCaffeine));
 
         // 3. [Specific 설정] Enum 반복
         for (CacheType type : CacheType.values()) {
@@ -37,14 +36,18 @@ public class CacheConfig {
                     .recordStats()
                     .maximumSize(type.getMaximumSize()); // 최대 개수 제한은 메모리 보호를 위해 유지
 
-            // [핵심 변경] 만료 시간이 0보다 클 때만 시간 설정을 적용합니다.
+            // 만료 시간이 0보다 클 때만 시간 설정을 적용합니다.
             // 즉, -1이나 0을 넣으면 시간 제한 코드가 실행되지 않아 '무제한'이 됩니다.
             if (type.getExpireAfterWrite() > 0) {
                 builder.expireAfterWrite(type.getExpireAfterWrite(), TimeUnit.MINUTES);
             }
 
             // 캐시 등록
-            cacheManager.registerCustomCache(type.getCacheName(), builder.build());
+            //캐시 이름과 빌드된 캐시 객체에 대해 Null 체크 명시
+            cacheManager.registerCustomCache(
+                Objects.requireNonNull(type.getCacheName()), 
+                Objects.requireNonNull(builder.build())
+            );
         }
 
         return cacheManager;

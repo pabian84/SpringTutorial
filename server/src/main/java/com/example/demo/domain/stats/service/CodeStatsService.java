@@ -41,13 +41,13 @@ public class CodeStatsService {
                               String ext = getExtension(path.toString());
                               
                               if (ext.equals("java")) {
-                                  stats.merge("Java", lines, Long::sum);
+                                  stats.merge("Java", lines, (line1, line2) -> line1 + line2);
                               } else if (ext.equals("ts") || ext.equals("tsx")) {
-                                  stats.merge("TypeScript/React", lines, Long::sum);
+                                  stats.merge("TypeScript/React", lines, (line1, line2) -> line1 + line2);
                               } else if (ext.equals("css") || ext.equals("scss")) {
-                                  stats.merge("CSS/Style", lines, Long::sum);
+                                  stats.merge("CSS/Style", lines, (line1, line2) -> line1 + line2);
                               } else {
-                                  stats.merge("Config/Etc", lines, Long::sum);
+                                  stats.merge("Config/Etc", lines, (line1, line2) -> line1 + line2);
                               }
                           } catch (Exception e) {
                               // 읽기 실패한 파일은 무시

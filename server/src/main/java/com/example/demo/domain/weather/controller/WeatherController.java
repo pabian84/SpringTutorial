@@ -21,12 +21,14 @@ public class WeatherController {
     @GetMapping
     public WeatherRes getWeather(
         @RequestParam(value = "lat", required = false) Double lat,
-        @RequestParam(value = "lon", required = false) Double lon
+        @RequestParam(value = "lon", required = false) Double lon,
+        @RequestParam(value = "hourlyLimit", required = false, defaultValue = "26") Integer hourlyLimit,
+        @RequestParam(value = "includeWeekly", required = false, defaultValue = "true") Boolean includeWeekly
     ) {
         // 값이 안 넘어오면 기본값(용인) 사용
         double targetLat = (lat != null) ? lat : 37.241086;
         double targetLon = (lon != null) ? lon : 127.177553;
 
-        return weatherProvider.getWeather(targetLat, targetLon);
+        return weatherProvider.getWeather(targetLat, targetLon, hourlyLimit, includeWeekly);
     }
 }
