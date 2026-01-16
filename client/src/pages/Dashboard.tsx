@@ -16,8 +16,8 @@ import MemoWidget from '../components/MemoWidget';
 import ServerMonitor from '../components/Servermonitor';
 import WeatherWidget from '../components/WeatherWidget';
 import { useUserLocation } from '../contexts/UserLocationContext';
-import type { ChatHistoryDTO, StockDTO, SystemStatusDTO, UserDTO } from '../types/dtos'; // 통합 DTO 가져오기
-import { showToast } from '../utils/alert';
+import type { ChatHistoryDTO, MemoDTO, StockDTO, SystemStatusDTO, UserDTO } from '../types/dtos'; // 통합 DTO 가져오기
+import { showConfirm, showToast } from '../utils/alert';
 
 const WS_URL = import.meta.env.VITE_WS_URL;
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -205,6 +205,44 @@ export default function Dashboard() {
     },
   });
 
+  // 메모 데이터 Fetch (React Query 사용) -> 상태 끌어올리기 적용
+  const { data: memos = [], refetch: refetchMemos } = useQuery({
+    queryKey: ['memos', myId],
+    queryFn: async () => {
+       const res = await axios.get<MemoDTO[]>(`/api/memo/${myId}`);
+       return res.data;
+    },
+    enabled: !!myId, 
+    refetchOnWindowFocus: false, 
+  });
+
+  // 메모 추가 핸들러
+  const handleAddMemo = useCallback(async (content: string) => {
+    if (!myId) return;
+    try {
+      await axios.post('/api/memo', { userId: myId, content });
+      refetchMemos(); // 목록 갱신 -> 모든 MemoWidget에 반영됨
+    } catch (e) {
+      console.error("메모 추가 실패", e);
+      showToast('메모 저장 실패', 'error');
+    }
+  }, [myId, refetchMemos]);
+
+  // 메모 삭제 핸들러
+  const handleDeleteMemo = useCallback(async (id: number) => {
+    const result = await showConfirm('메모 삭제', '이 메모를 삭제하시겠습니까?');
+    if (result.isConfirmed) {
+      try {
+        await axios.delete(`/api/memo/${id}`);
+        showToast('메모가 삭제되었습니다.', 'success');
+        refetchMemos(); // 목록 갱신 -> 모든 MemoWidget에 반영됨
+      } catch (e) {
+        console.error("메모 삭제 실패", e);
+        showToast('삭제 중 오류가 발생했습니다.', 'error');
+      }
+    }
+  }, [refetchMemos]);
+
   // 대시보드 상태 감지용 WebSocket (User Update 감지)
   useEffect(() => {
     // 안전한 연결 조건: 소켓이 없거나, 완전히 닫혔을 때만 연결
@@ -378,7 +416,7 @@ export default function Dashboard() {
   const codeStatsWidget = useMemo(() => <CodeStatsWidget data={codeData} />, [codeData]);
   // ServerMonitor는 serverData가 바뀔 때만 갱신됨
   const serverMonitorWidget = useMemo(() => <ServerMonitor data={serverData} />, [serverData]);
-  const memoWidget = useMemo(() => <MemoWidget />, []);
+  const memoWidget = useMemo(() => <MemoWidget memos={memos} onAdd={handleAddMemo} onDelete={handleDeleteMemo} />, [memos, handleAddMemo, handleDeleteMemo]);
   // useMemo 의존성 배열에 handleSendMessage 추가 (경고 해결)
   const chatWidget = useMemo(() => (
     <ChatWidget myId={myId!} messages={chatMessages} onSendMessage={handleSendMessage} />

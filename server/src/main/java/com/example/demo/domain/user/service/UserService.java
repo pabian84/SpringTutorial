@@ -8,6 +8,7 @@ import java.util.Map;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -165,5 +166,29 @@ public class UserService {
 
     public List<AccessLog> getLogs(String userId) {
         return userMapper.findLogs(userId);
+    }
+
+    // 리프레시 토큰으로 액세스 토큰 재발급
+    public Map<String, Object> refreshAccessToken(String refreshToken) {
+        // 1. 토큰 유효성 검사 (서명 위조 등)
+        if (!jwtTokenProvider.validateToken(refreshToken)) {
+            throw new RuntimeException("Invalid Refresh Token");
+        }
+
+        // 2. 토큰에서 사용자 ID 추출
+        Authentication auth = jwtTokenProvider.getAuthentication(refreshToken);
+        String userId = auth.getName();
+
+        // 3. (선택) DB에 저장된 리프레시 토큰과 일치하는지, 만료 안 됐는지 더블 체크
+        // (여기서는 간단하게 JWT 유효성만으로 처리하지만, 보안을 높이려면 DB 조회 로직 추가 권장)
+
+        // 4. 새 액세스 토큰 발급
+        String newAccessToken = jwtTokenProvider.createAccessToken(userId);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "ok");
+        result.put("accessToken", newAccessToken);
+        
+        return result;
     }
 }

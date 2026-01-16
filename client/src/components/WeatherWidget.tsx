@@ -134,7 +134,8 @@ export default function WeatherWidget() {
                   <motion.div key={`${hour.time}-${idx}`} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '40px' }}>
                     <span style={{ fontSize: '12px', marginBottom: '6px', opacity: 0.9 }}>{ hour.time }</span>
                     <WeatherIcon sky={hour.sky} isNight={hour.isNight || false} size={26} />
-                    <span style={{ fontSize: '15px', fontWeight: 'bold' }}>{Math.round(hour.temp)}°</span>
+
+                    <span style={{ fontSize: '15px', fontWeight: 'bold' }}>{ hour.type === 'special' ? hour.sky : Math.round(hour.temp) + '°' }</span>
                   </motion.div>
                 ))}
               </AnimatePresence>

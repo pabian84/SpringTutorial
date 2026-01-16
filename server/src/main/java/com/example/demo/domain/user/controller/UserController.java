@@ -106,4 +106,13 @@ public class UserController {
     public List<AccessLog> logs(@PathVariable("userId") String userId) {
         return userService.getLogs(userId);
     }
+
+    @Operation(summary = "토큰 갱신 (Refresh)")
+    @PostMapping("/refresh")
+    public Map<String, Object> refresh(@CookieValue(value = "refreshToken", required = false) String refreshToken) {
+        if (refreshToken == null) {
+            throw new RuntimeException("Refresh Token not found in cookie");
+        }
+        return userService.refreshAccessToken(refreshToken);
+    }
 }

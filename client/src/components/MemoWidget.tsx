@@ -1,65 +1,76 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { MemoDTO } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/alert';
 
-export default function MemoWidget() {
+// 부모(Dashboard)로부터 받을 Props 정의
+interface MemoWidgetProps {
+  memos: MemoDTO[];
+  onAdd: (content: string) => void;
+  onDelete: (id: number) => void;
+}
+
+// 껍데기 역할: 받은 데이터를 그대로 렌더링 함수에 넘김
+export default function MemoWidget(props: MemoWidgetProps) {
+  // 껍데기 역할: 받은 데이터를 그대로 렌더링 함수에 넘김
+  return <MemoRender {...props} />;
+}
+
+// 독립 실행형 메모 위젯 컴포넌트
+export function StandaloneMemoWidget() {
   const [memos, setMemos] = useState<MemoDTO[]>([]);
-  const [input, setInput] = useState('');
-  
   // 로그인한 내 아이디 가져오기
   const myId = localStorage.getItem('myId');
 
-  useEffect(() => {
-    if (!myId) {
-        return;
+  // 데이터 로딩
+  const fetchMemos = useCallback(async () => {
+    if (!myId) return;
+    try {
+      const res = await axios.get<MemoDTO[]>(`/api/memo/${myId}`);
+      setMemos(res.data);
+    } catch (e) {
+      console.error("메모 로딩 실패", e);
     }
-    // 메모 추가
-    const fetchMemos = async () => {
-      try {
-        const res = await axios.get(`/api/memo/${myId}`);
-        setMemos(res.data);
-      } catch (e) {
-        console.error("메모 로딩 실패", e);
-      }
-    };
-
-    fetchMemos();
   }, [myId]);
 
+  // 초기 로딩은 useEffect 내부에서 단독 처리 (가장 정석적인 방법)
+  // 외부 함수(fetchMemos)를 의존성으로 넣지 않고, 로직을 내부에 정의하여 충돌 방지
+  useEffect(() => {
+    if (!myId) return;
+
+    const initLoad = async () => {
+        try {
+          const res = await axios.get<MemoDTO[]>(`/api/memo/${myId}`);
+          setMemos(res.data);
+        } catch (e) {
+          console.error("메모 초기 로딩 실패", e);
+        }
+    };
+
+    initLoad();
+  }, [myId]); // 의존성은 오직 'myId' 값 하나뿐임 (함수 의존성 제거)
+
   // 메모 추가
-  const addMemo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || !myId) return;
-    
-    // [수정] userId를 같이 전송
-    await axios.post('/api/memo', { 
-      userId: myId,
-      content: input 
-    });
-    
-    setInput('');
-    // 목록 갱신 (코드가 중복되지만, 안전을 위해 직접 호출)
-    // 간단하게 목록만 다시 불러오기 위해 axios를 한번 더 씁니다.
-    const res = await axios.get(`/api/memo/${myId}`);
-    setMemos(res.data);
+  const handleAdd = async (content: string) => {
+    try {
+      await axios.post('/api/memo', { userId: myId, content });
+      fetchMemos(); // 재로딩
+    } catch (e) {
+      console.error("메모 추가 실패", e);
+      showToast('메모 저장 실패', 'error');
+    }
   };
 
-  const deleteMemo = async (id: number) => {
+  // 메모 삭제
+  const handleDelete = async (id: number) => {
     const result = await showConfirm('메모 삭제', '이 메모를 삭제하시겠습니까?');
     // yes 클릭 시 삭제 진행
     if (result.isConfirmed) {
       try {
         await axios.delete(`/api/memo/${id}`);
-
         // 삭제 성공 후 토스트 알림
         showToast('메모가 삭제되었습니다.', 'success');
-        
-        // 목록 갱신
-        if (myId) {
-            const res = await axios.get(`/api/memo/${myId}`);
-            setMemos(res.data);
-        }
+        fetchMemos(); // 재로딩
       } catch (e) {
         console.error("메모 삭제 실패", e);
         showToast('삭제 중 오류가 발생했습니다.', 'error');
@@ -67,10 +78,25 @@ export default function MemoWidget() {
     }
   };
 
+  // 스스로 관리하는 상태와 핸들러를 렌더링 컴포넌트에 주입
+  return <MemoRender memos={memos} onAdd={handleAdd} onDelete={handleDelete} />;
+}
+
+function MemoRender({ memos, onAdd, onDelete }: MemoWidgetProps) {
+  // 입력창 상태는 UI 고유의 것이므로 여기서 관리
+  const [input, setInput] = useState('');
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    onAdd(input); // 부모가 준 핸들러 실행
+    setInput('');
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 입력창 영역 */}
-      <form onSubmit={addMemo} style={{ display: 'flex', gap: '8px', marginBottom: '15px', height: '42px' }}>
+      <form onSubmit={onSubmit} style={{ display: 'flex', gap: '8px', marginBottom: '15px', height: '42px' }}>
         <input
           type="text"
           value={input}
@@ -151,7 +177,7 @@ export default function MemoWidget() {
               <button 
                 onClick={(e) => {
                     e.stopPropagation(); // 버튼 클릭이 부모로 전파되는 것 방지
-                    deleteMemo(memo.id);
+                    onDelete(memo.id);
                 }}
                 title="삭제"
                 style={{ 
