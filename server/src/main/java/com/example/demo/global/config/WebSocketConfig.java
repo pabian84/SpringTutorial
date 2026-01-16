@@ -1,7 +1,6 @@
 package com.example.demo.global.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.lang.NonNull;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
@@ -14,21 +13,18 @@ import com.example.demo.handler.UserConnectionHandler;
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
 
-    @NonNull 
     private final DashboardHandler dashboardHandler;
-    @NonNull 
     private final ChatHandler chatHandler;
-    @NonNull 
-    private final UserConnectionHandler userConnectionHandler;
+        private final UserConnectionHandler userConnectionHandler;
 
-    public WebSocketConfig(@NonNull DashboardHandler dashboardHandler, @NonNull ChatHandler chatHandler, @NonNull UserConnectionHandler userConnectionHandler) {
+    public WebSocketConfig(DashboardHandler dashboardHandler, ChatHandler chatHandler, UserConnectionHandler userConnectionHandler) {
         this.dashboardHandler = dashboardHandler;
         this.chatHandler = chatHandler;
         this.userConnectionHandler = userConnectionHandler;
     }
 
     @Override
-    public void registerWebSocketHandlers(@NonNull WebSocketHandlerRegistry registry) {
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         // ws://localhost:8080/ws/dashboard 로 접속하면 통신 시작
         registry.addHandler(dashboardHandler, "/ws/dashboard")
                 .setAllowedOrigins("*"); // 모든 곳에서 접속 허용 (CORS 무시)

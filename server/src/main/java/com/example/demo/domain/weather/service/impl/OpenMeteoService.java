@@ -8,17 +8,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import com.example.demo.domain.weather.dto.WeatherRes;
 import com.example.demo.domain.weather.service.WeatherProvider;
@@ -29,10 +24,10 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class OpenMeteoService implements WeatherProvider {
     // [수정] RestTemplate을 매번 생성하지 않고 주입받아 사용 (Spring 정석)
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
 
-    public OpenMeteoService(RestTemplateBuilder builder) {
-        this.restTemplate = builder.build();
+    public OpenMeteoService(RestClient.Builder builder) {
+        this.restClient = builder.build();
     }
 
     @Override
@@ -62,7 +57,9 @@ public class OpenMeteoService implements WeatherProvider {
                 + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max"
                 + "&timezone=auto&forecast_days=7";
 
-        Map<String, Object> response = safeCast(restTemplate.getForObject(url, Map.class), String.class, Object.class);
+        Map<String, Object> response = safeCast(
+            restClient.get().uri(url).retrieve().body(Map.class),
+            String.class, Object.class);
 
         // 데이터 파싱 (복잡한 로직은 Service에 숨김)
         WeatherRes res = new WeatherRes();
@@ -72,19 +69,12 @@ public class OpenMeteoService implements WeatherProvider {
             String geoUrl = "https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat
                     + "&lon=" + lon + "&zoom=10&addressdetails=1&accept-language=ko";
 
-            // Nominatim은 User-Agent 헤더가 필수입니다.
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("User-Agent", "SpringTutorialApp/1.0"); // 앱 이름 임의 지정
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-
-            //ResponseEntity<Map> geoResponse = restTemplate.exchange(geoUrl, HttpMethod.GET, entity, Map.class);
-            // [경고 해결] 명확한 타입 지정 (Raw Type 경고 제거)
-            ResponseEntity<Map<String, Object>> geoResponse = restTemplate.exchange(
-                geoUrl, 
-                Objects.requireNonNull(HttpMethod.GET),
-                entity, 
-                new ParameterizedTypeReference<Map<String, Object>>() {}
-            );
+            // User-Agent 헤더 설정 (Nominatim 정책)
+            ResponseEntity<Map<String, Object>> geoResponse = restClient.get()
+                .uri(geoUrl)
+                .headers(h -> h.add("User-Agent", "SpringTutorialApp/1.0"))
+                .retrieve()
+                .toEntity(new ParameterizedTypeReference<Map<String, Object>>() {});
             // [경고 해결] Null Pointer Access 방지
             Map<String, Object> body = geoResponse.getBody();
             Map<String, Object> addressMap;

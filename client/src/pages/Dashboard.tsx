@@ -409,9 +409,11 @@ export default function Dashboard() {
           <h1 style={{ margin: 0, fontSize: '24px' }}>Smart Dashboard</h1>
           <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>Logged in as {myId}</span>
         </div>
-        <button onClick={handleLogout} style={{ width: 'auto', padding: '10px 20px', fontSize: '14px' }}>
-          System Logout
-        </button>
+        <div style={{ alignContent: 'center' }}>
+          <button onClick={handleLogout} style={{ width: 'auto', height: '75%', padding: '5px 10px', fontSize: '14px' }}>
+            System Logout
+          </button>
+        </div>
       </header>
 
       {/* 2. 메인 그리드 영역 */}
