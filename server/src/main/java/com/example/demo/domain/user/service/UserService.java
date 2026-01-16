@@ -170,6 +170,9 @@ public class UserService {
 
     // 리프레시 토큰으로 액세스 토큰 재발급
     public Map<String, Object> refreshAccessToken(String refreshToken) {
+
+        log.warn("리프레시 토큰으로 액세스 토큰 재발급 시도: {}", refreshToken);
+
         // 1. 토큰 유효성 검사 (서명 위조 등)
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             throw new RuntimeException("Invalid Refresh Token");
@@ -188,6 +191,8 @@ public class UserService {
         Map<String, Object> result = new HashMap<>();
         result.put("status", "ok");
         result.put("accessToken", newAccessToken);
+
+        log.info("새 액세스 토큰 발급 완료 for userId={}: {}", userId, newAccessToken);
         
         return result;
     }

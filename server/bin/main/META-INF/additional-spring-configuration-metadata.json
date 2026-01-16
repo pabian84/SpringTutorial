@@ -1,0 +1,48 @@
+{
+  "groups": [
+    {
+      "name": "jwt",
+      "type": "com.example.demo.global.config.JwtProperties",
+      "sourceType": "com.example.demo.global.config.JwtProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "jwt.access-token-validity-in-seconds",
+      "type": "java.lang.Long",
+      "sourceType": "com.example.demo.global.config.JwtProperties",
+      "defaultValue": 0
+    },
+    {
+      "name": "jwt.refresh-token-validity-in-seconds",
+      "type": "java.lang.Long",
+      "sourceType": "com.example.demo.global.config.JwtProperties",
+      "defaultValue": 0
+    },
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "sourceType": "com.example.demo.global.config.JwtProperties"
+    },
+    {
+      "name": "spring.h2.console.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether to enable the H2 console."
+    },
+    {
+      "name": "spring.h2.console.path",
+      "type": "java.lang.String",
+      "description": "The path available to the H2 console.",
+      "defaultValue": "/h2-console"
+    },
+    {
+      "name": "spring.h2.console.settings.web-allow-others",
+      "type": "java.lang.Boolean",
+      "description": "Whether to enable remote access."
+    }
+  ],
+  "hints": [],
+  "ignored": {
+    "properties": []
+  }
+}

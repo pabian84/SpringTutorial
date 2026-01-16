@@ -12,9 +12,11 @@ export const useWeather = (lat: number | null, lon: number | null, hourlyLimit: 
       return res.data;
     },
     enabled: !!lat && !!lon, // 좌표가 있을 때만 실행
-    staleTime: 1000 * 60 * 30, // [핵심] 30분간 캐시 유지 (서버 요청 안 함 -> 즉시 로딩)
+    staleTime: 1000 * 60 * 30, // 30분간 캐시 유지 (서버 요청 안 함 -> 즉시 로딩)
     gcTime: 1000 * 60 * 60, // 1시간 뒤 메모리 해제
     retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
   return { 

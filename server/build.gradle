@@ -31,7 +31,7 @@ dependencies {
     // MyBatis Starter: Spring Boot 4.0 호환 버전 (2025.12.01 출시)
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.1'
     // H2 데이터베이스 (테스트용 인메모리 DB)
-    runtimeOnly 'com.h2database:h2'
+    implementation 'com.h2database:h2'
 
     // Swagger (API 문서 자동화)
     // Spring Boot 4.0 호환 버전 (2026.01.01 출시)
@@ -54,6 +54,9 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     // lombok 애노테이션 프로세서
     annotationProcessor 'org.projectlombok:lombok'
+
+    // yml 설정을 클래스로 매핑하고, IDE에 자동완성 정보를 제공하는 처리기
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 }
 
 // 이 부분이 작동하려면 맨 위 plugins에 id 'eclipse'가 필수입니다.

@@ -43,7 +43,7 @@ jwt:
   # HS256 알고리즘을 위해선 32byte(영문 32자) 이상의 긴 비밀키가 필요합니다.
   secret: "MySuperSecretKeyForSpringTutorialProject2026!!KeepItSafe" 
   # 액세스 토큰 만료 (30분)
-  access-token-validity-in-seconds: 1800 
+  access-token-validity-in-seconds: 1800
   # 리프레시 토큰 만료 (7일) - 이게 '로그인 유지'의 핵심입니다.
   refresh-token-validity-in-seconds: 604800
 

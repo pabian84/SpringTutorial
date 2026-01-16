@@ -1,45 +1,39 @@
 package com.example.demo.global.security;
 
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
-import jakarta.annotation.PostConstruct;
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
+import javax.crypto.SecretKey;
+
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.util.Date;
+import com.example.demo.global.config.JwtProperties;
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor // 생성자 주입 자동화 (코드가 확 줄어듭니다)
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret}") // yml에서 비밀키 가져옴
-    private String secretKey;
-
-    @Value("${jwt.access-token-validity-in-seconds}")
-    private long accessTokenValidity;
-
-    @Value("${jwt.refresh-token-validity-in-seconds}")
-    private long refreshTokenValidity;
-
+    // @Value 대신 Properties 객체 주입
+    private final JwtProperties jwtProperties;
     private final UserDetailsService userDetailsService;
     private SecretKey key;
-
-    public JwtTokenProvider(UserDetailsService userDetailsService) {
-        this.userDetailsService = userDetailsService;
-    }
 
     @PostConstruct
     protected void init() {
         // 비밀키를 암호화 객체로 변환
-        this.key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+        this.key = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
     // 1. 토큰 생성 (Access, Refresh 둘 다)
@@ -56,11 +50,11 @@ public class JwtTokenProvider {
     }
     
     public String createAccessToken(String userId) {
-        return createToken(userId, accessTokenValidity);
+        return createToken(userId, jwtProperties.getAccessTokenValidityInSeconds());
     }
     
     public String createRefreshToken(String userId) {
-        return createToken(userId, refreshTokenValidity);
+        return createToken(userId, jwtProperties.getRefreshTokenValidityInSeconds());
     }
 
     // 2. 토큰에서 사용자 정보 꺼내기 (인증 객체 생성)
@@ -86,6 +80,9 @@ public class JwtTokenProvider {
         try {
             Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
             return true;
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            log.info("만료된 토큰입니다. (Refresh 시도 예정)"); // 에러 아님
+            return false;
         } catch (Exception e) {
             log.error("유효하지 않은 토큰입니다: {}", e.getMessage());
             return false;
