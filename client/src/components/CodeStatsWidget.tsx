@@ -54,7 +54,7 @@ export function StrandaloneCodeStatsWidget() {
 function CodeStatsChart({ data }: ChartProps) {
   return (
     <div style={{ width: '100%', height: '100%' }}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
         <PieChart>
           <Pie
             data={data}

@@ -22,7 +22,9 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Tag(name = "User API", description = "사용자/로그인 관련 API")
 @RestController
 @RequestMapping("/api/user")
@@ -36,7 +38,6 @@ public class UserController {
         // IP와 브라우저 정보를 추출해서 서비스로 넘김
         String ip = request.getRemoteAddr();
         String userAgent = request.getHeader("User-Agent");
-        
         // 서비스 호출
         Map<String, Object> result = userService.login(req, ip, userAgent);
 
@@ -111,7 +112,9 @@ public class UserController {
     @PostMapping("/refresh")
     public Map<String, Object> refresh(@CookieValue(value = "refreshToken", required = false) String refreshToken) {
         if (refreshToken == null) {
-            throw new RuntimeException("Refresh Token not found in cookie");
+            //throw new RuntimeException("Refresh Token not found in cookie");
+            log.warn("리프레시 토큰이 쿠키에 없습니다.");
+            return Map.of("status", "error", "message", "Refresh Token not found");
         }
         return userService.refreshAccessToken(refreshToken);
     }

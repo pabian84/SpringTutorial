@@ -42,7 +42,7 @@ export function StandaloneExchangeWidget() {
 function ExchangeChart({ data }: ChartProps) {
   return (
     <div style={{ width: '100%', height: '100%' }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
           <BarChart data={data} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
             {/* 다크 테마라 글씨가 안 보일 수 있어서 밝은 색(#ccc)으로 변경 */}
             <XAxis dataKey="symbol" tick={{ fill: '#ccc', fontSize: 12 }} />

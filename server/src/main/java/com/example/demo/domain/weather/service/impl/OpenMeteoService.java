@@ -343,13 +343,13 @@ public class OpenMeteoService implements WeatherProvider {
             LocalDateTime sunset = LocalDateTime.parse(sunsetIso, DateTimeFormatter.ISO_DATE_TIME);
 
             // 1. 일출 구간 (앞뒤 15분)
-            if (isWithinRange(now, sunrise, 15)) {
+            if (isWithinRange(now, sunrise, 12, 8)) {
                 log.info("일출 구간 감지: " + now + " / " + sunrise);
                 return "일출(" + sunrise.toString().substring(11, 16) + ")"; // 일출 상태 반환
             }
 
             // 2. 일몰 구간 (앞뒤 15분)
-            if (isWithinRange(now, sunset, 15)) {
+            if (isWithinRange(now, sunset, 12, 8)) {
                 log.info("일몰 구간 감지: " + now + " / " + sunset);
                 return "일몰(" + sunset.toString().substring(11, 16) + ")"; // 일몰 상태 반환
             }
@@ -363,9 +363,11 @@ public class OpenMeteoService implements WeatherProvider {
     }
 
     // 시간 범위 체크 헬퍼
-    private boolean isWithinRange(LocalDateTime now, LocalDateTime target, int minutes) {
-        LocalDateTime start = target.minusMinutes(minutes);
-        LocalDateTime end = target.plusMinutes(minutes);
+    private boolean isWithinRange(LocalDateTime now, LocalDateTime target, int beforeMinutes, int afterMinutes) {
+        // target 기준 '전' 시간 계산 (12분)
+        LocalDateTime start = target.minusMinutes(beforeMinutes);
+        // target 기준 '후' 시간 계산 (8분)
+        LocalDateTime end = target.plusMinutes(afterMinutes);
         // now가 start보다 뒤이고(end 포함하지 않음), end보다 앞이어야 함
         // isAfter/isBefore는 경계값을 포함하지 않으므로 정확하게는 >=, <= 처리가 필요할 수 있으나
         // 1분 단위 비교에서는 큰 문제 없음.

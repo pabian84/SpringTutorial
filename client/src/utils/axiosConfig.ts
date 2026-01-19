@@ -55,6 +55,13 @@ export const setupAxiosInterceptors = () => {
 
       // 2. 401 에러(인증 실패)가 떴는데, 아직 재시도를 안 한 요청이라면
       if (error.response && (error.response.status === 401 || error.response.status === 403) && !originalRequest._retry) {
+
+        // 토큰이 없는데 403이 뜨면 바로 로그인 페이지로
+        if (error.response.status === 403 && !localStorage.getItem('accessToken')) {
+             window.location.href = '/';
+             return Promise.reject(error);
+        }
+
         // 이미 누군가 갱신을 하고 있다면? -> 줄 서서 기다림
         if (isRefreshing) {
           return new Promise((resolve) => {

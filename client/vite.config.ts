@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import cesium from 'vite-plugin-cesium'; // 세슘 플러그인 임포트
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cesium()], // 세슘 플러그인 추가
   server: {
     proxy: {
       '/api': {

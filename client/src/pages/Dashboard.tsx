@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'; // 임포트 추가
 import axios from 'axios';
 import { AnimatePresence, motion } from 'framer-motion'; // 애니메이션용
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary'; // 에러 바운더리 관련 임포트
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy'; // React Grid Layout 관련
-import { BiExpand, BiX } from 'react-icons/bi';
-import { FaChartLine, FaCode, FaComments, FaMapMarkedAlt, FaServer, FaStickyNote } from 'react-icons/fa';
+import { BiDetail, BiExpand, BiX } from 'react-icons/bi';
+import { FaChartLine, FaCode, FaComments, FaGlobeAsia, FaMapMarkedAlt, FaServer, FaStickyNote } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import ChatWidget from '../components/ChatWidget';
 import CodeStatsWidget, { type CodeData } from '../components/CodeStatsWidget';
@@ -15,6 +15,7 @@ import KakaoMapWidget from '../components/KakaoMapWidget';
 import MemoWidget from '../components/MemoWidget';
 import ServerMonitor from '../components/Servermonitor';
 import WeatherWidget from '../components/WeatherWidget';
+import CesiumWidget from '../components/cesium/CesiumWidget'; // 세슘 위젯
 import { useUserLocation } from '../contexts/UserLocationContext';
 import type { ChatHistoryDTO, MemoDTO, StockDTO, SystemStatusDTO, UserDTO } from '../types/dtos'; // 통합 DTO 가져오기
 import { showConfirm, showToast } from '../utils/alert';
@@ -25,15 +26,64 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 // x: 가로 위치(0~11), y: 세로 위치, w: 너비, h: 높이
 const initialLayouts = {
   lg: [
-    { i: 'weather', x: 0, y: 0, w: 9, h: 8 },      // 날씨 (왼쪽 상단)
-    { i: 'online', x: 9, y: 0, w: 3, h: 18 },       // 접속자 (오른쪽 길게)
-    { i: 'map', x: 0, y: 8, w: 9, h: 10 },          // 지도 (날씨 아래)
-    { i: 'exchange', x: 0, y: 16, w: 6, h: 8 },    // 환율 (지도 아래 1)
-    { i: 'code', x: 6, y: 16, w: 6, h: 8 },        // 코드 통계 (지도 아래 2)
-    { i: 'server', x: 0, y: 16, w: 6, h: 8 },      // 서버 모니터 (맨 아래)
-    { i: 'memo', x: 6, y: 16, w: 3, h: 8 },        // 메모
-    { i: 'chat', x: 9, y: 16, w: 3, h: 8 },        // 채팅
+    { i: 'weather', x: 0, y: 0,  w: 9, h: 8 },    // 날씨 (왼쪽 상단)
+    { i: 'online',  x: 9, y: 0,  w: 3, h: 8 },    // 접속자 (오른쪽 길게)
+    { i: 'map',     x: 0, y: 8,  w: 6, h: 10 },   // 지도 (날씨 아래)
+    { i: 'cesium',  x: 6, y: 8,  w: 6, h: 10 },   // 3D 지도 (지도 오른쪽)
+    { i: 'exchange',x: 0, y: 16, w: 6, h: 8 },    // 환율 (지도 아래 1)
+    { i: 'code',    x: 6, y: 16, w: 6, h: 8 },    // 코드 통계 (지도 아래 2)
+    { i: 'server',  x: 0, y: 14, w: 6, h: 8 },    // 서버 모니터 (맨 아래)
+    { i: 'memo',    x: 6, y: 14, w: 3, h: 8 },    // 메모
+    { i: 'chat',    x: 9, y: 14, w: 3, h: 8 },    // 채팅
   ],
+  // [md]: 10컬럼 기준 (자동 변환)
+  md: [
+    { i: 'weather', x: 0, y: 0, w: 7, h: 8 },
+    { i: 'online', x: 7, y: 0, w: 3, h: 8 },
+    { i: 'map', x: 0, y: 8, w: 5, h: 10 },
+    { i: 'cesium', x: 5, y: 8, w: 5, h: 10 },
+    { i: 'exchange', x: 0, y: 18, w: 5, h: 8 },
+    { i: 'code', x: 5, y: 18, w: 5, h: 8 },
+    { i: 'server', x: 0, y: 26, w: 10, h: 6 },
+    { i: 'memo', x: 0, y: 32, w: 5, h: 8 },
+    { i: 'chat', x: 5, y: 32, w: 5, h: 8 },
+  ],
+  // [sm]: 6컬럼 기준 (태블릿)
+  sm: [
+    { i: 'weather', x: 0, y: 0, w: 4, h: 8 },
+    { i: 'online', x: 4, y: 0, w: 2, h: 8 },
+    { i: 'map', x: 0, y: 8, w: 6, h: 8 },
+    { i: 'cesium', x: 0, y: 16, w: 6, h: 8 },
+    { i: 'exchange', x: 0, y: 24, w: 3, h: 8 },
+    { i: 'code', x: 3, y: 24, w: 3, h: 8 },
+    { i: 'server', x: 0, y: 32, w: 6, h: 6 },
+    { i: 'memo', x: 0, y: 38, w: 3, h: 8 },
+    { i: 'chat', x: 3, y: 38, w: 3, h: 8 },
+  ],
+  // [xs]: 4컬럼 기준 (모바일)
+  xs: [
+    { i: 'weather', x: 0, y: 0, w: 4, h: 6 },
+    { i: 'online', x: 0, y: 6, w: 4, h: 4 },
+    { i: 'map', x: 0, y: 10, w: 4, h: 6 },
+    { i: 'cesium', x: 0, y: 16, w: 4, h: 6 },
+    { i: 'exchange', x: 0, y: 22, w: 4, h: 6 },
+    { i: 'code', x: 0, y: 28, w: 4, h: 6 },
+    { i: 'server', x: 0, y: 34, w: 4, h: 6 },
+    { i: 'memo', x: 0, y: 40, w: 4, h: 6 },
+    { i: 'chat', x: 0, y: 46, w: 4, h: 8 },
+  ],
+  // [xxs]: 2컬럼 (초소형)
+  xxs: [
+    { i: 'weather', x: 0, y: 0, w: 2, h: 6 },
+    { i: 'online', x: 0, y: 6, w: 2, h: 4 },
+    { i: 'map', x: 0, y: 10, w: 2, h: 6 },
+    { i: 'cesium', x: 0, y: 16, w: 2, h: 6 },
+    { i: 'exchange', x: 0, y: 22, w: 2, h: 6 },
+    { i: 'code', x: 0, y: 28, w: 2, h: 6 },
+    { i: 'server', x: 0, y: 34, w: 2, h: 6 },
+    { i: 'memo', x: 0, y: 40, w: 2, h: 6 },
+    { i: 'chat', x: 0, y: 46, w: 2, h: 8 },
+  ]
 };
 
 // 공통 카드 컴포넌트 (스타일 통일 및 애니메이션 담당)
@@ -46,10 +96,11 @@ interface DashboardCardProps {
   onClose?: () => void;
   isExpanded?: boolean;
   noHeader?: boolean; // 날씨처럼 헤더 없는 경우
+  headerAction?: React.ReactNode; // 헤더 우측에 들어갈 커스텀 액션 버튼
 }
 
 // React.memo를 사용하여 props가 변하지 않으면 재렌더링 방지
-const DashboardCard = memo(({ id, title, icon, children, onExpand, onClose, isExpanded, noHeader }: DashboardCardProps) => {
+const DashboardCard = memo(({ id, title, icon, children, onExpand, onClose, isExpanded, noHeader, headerAction }: DashboardCardProps) => {
   return (
     <motion.div
       layoutId={id} // [핵심] 이 ID가 같으면 그리드<->전체화면 전환 시 이어지는 효과
@@ -107,6 +158,13 @@ const DashboardCard = memo(({ id, title, icon, children, onExpand, onClose, isEx
 
           {/* [우측] 버튼 (고정) */}
           <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+            {/* [수정] headerAction 렌더링 (확장 버튼 앞에 배치) */}
+            {headerAction && (
+              <div style={{ marginRight: '5px', display: 'flex', alignItems: 'center' }}>
+                {headerAction}
+              </div>
+            )}
+            {/* 확장/닫기 버튼 */}
             {onExpand && !isExpanded && (
               <button
                 onClick={(e) => {
@@ -118,7 +176,7 @@ const DashboardCard = memo(({ id, title, icon, children, onExpand, onClose, isEx
                   cursor: 'pointer', padding: '4px', display: 'flex',
                   transition: 'color 0.2s'
                 }}
-                title="Expand"
+                title="확장 하기"
               >
                 <BiExpand size={20} />
               </button>
@@ -130,7 +188,7 @@ const DashboardCard = memo(({ id, title, icon, children, onExpand, onClose, isEx
                   background: 'none', border: 'none', color: '#fff',
                   cursor: 'pointer', padding: '4px', display: 'flex'
                 }}
-                title="Close"
+                title="닫기"
               >
                 <BiX size={24} />
               </button>
@@ -411,6 +469,9 @@ export default function Dashboard() {
   const mapWidget = useMemo(() => (
     locLoading || !lat || !lon ? <div>위치 정보 찾는 중...</div> : <KakaoMapWidget lat={lat} lon={lon} />
   ), [locLoading, lat, lon]);
+  // [추가] 세슘 위젯 useMemo 생성
+  const cesiumWidget = useMemo(() => <CesiumWidget />, []);
+  // 환율 위젯은 exchangeData가 바뀔 때만 갱신됨
   const exchangeWidget = useMemo(() => <ExchangeWidget data={exchangeData} />, [exchangeData]);
   // CodeStatsWidget은 의존성이 없으므로 마운트 시 한 번만 생성됨 -> 애니메이션 재실행 방지
   const codeStatsWidget = useMemo(() => <CodeStatsWidget data={codeData} />, [codeData]);
@@ -427,6 +488,7 @@ export default function Dashboard() {
     weather: weatherWidget,
     online: onlineWidget,
     map: mapWidget,
+    cesium: cesiumWidget,
     exchange: exchangeWidget,
     code: codeStatsWidget,
     server: serverMonitorWidget,
@@ -438,6 +500,21 @@ export default function Dashboard() {
     container: { padding: '20px', maxWidth: '1400px', margin: '0 auto', color: '#eaeaea' },
     header: { display: 'flex', justifyContent: 'space-between', marginBottom: '20px' },
   };
+
+  // Cesium 상세 보기 버튼 (아이콘: BiDetail, 툴팁: 상세 보기)
+  const cesiumDetailButton = (
+    <button
+      onClick={() => navigate('/cesium')}
+      title="상세 보기"
+      style={{
+        background: 'none', border: 'none', color: '#aaa',
+        cursor: 'pointer', padding: '4px', display: 'flex',
+        transition: 'color 0.2s', marginRight: '5px'
+      }}
+    >
+      <BiDetail size={20} />
+    </button>
+  );
 
   return (
     <div style={styles.container}>
@@ -497,6 +574,19 @@ export default function Dashboard() {
             </DashboardCard>
           </div>
         </div>
+
+        {/* 3D 지도 (세슘) */}
+        <div key="cesium">
+          <div style={{ height: '100%' }}>
+            {expandedId !== 'cesium' && (
+            <DashboardCard id="cesium" 
+              title="3D Earth" icon={<FaGlobeAsia style={{ color: '#4facfe' }} />} 
+              onExpand={() => setExpandedId('cesium')} headerAction={cesiumDetailButton}>
+              {widgetContents.cesium}
+            </DashboardCard>
+            )}
+          </div>
+        </div>
         
         {/* 환율 차트 위젯 */}
         <div key="exchange">
@@ -506,7 +596,7 @@ export default function Dashboard() {
               onExpand={() => setExpandedId('exchange')}>
               {widgetContents.exchange}
             </DashboardCard>
-        </div>
+          </div>
         </div>
 
         {/* 프로젝트 코드 통계 */}
@@ -577,7 +667,8 @@ export default function Dashboard() {
                 {expandedId === 'weather' && <DashboardCard id="weather" noHeader isExpanded onClose={() => setExpandedId(null)}>{widgetContents.weather}</DashboardCard>}
                 {expandedId === 'online' && <DashboardCard id="online" title="Online" isExpanded onClose={() => setExpandedId(null)}><div style={{ height: '100%', overflowY: 'auto' }}>{widgetContents.online}</div></DashboardCard>}
                 {expandedId === 'map' && <DashboardCard id="map" title="Location" icon={<FaMapMarkedAlt style={{ color: '#00c6ff' }} />} isExpanded onClose={() => setExpandedId(null)}>{widgetContents.map}</DashboardCard>}
-                {expandedId === 'exchange' && <DashboardCard id="exchange" title="Exchange" icon={<FaChartLine style={{ color: '#f59e0b' }} />} isExpanded onClose={() => setExpandedId(null)}>{widgetContents.exchange}</DashboardCard>}
+                {expandedId === 'cesium' && <DashboardCard id="cesium" title="3D Earth" icon={<FaGlobeAsia style={{ color: '#4facfe' }} />} isExpanded onClose={() => setExpandedId(null)}>{widgetContents.cesium}</DashboardCard>}
+                {expandedId === 'exchange' && <DashboardCard id="exchange" title="Exchange" icon={<FaChartLine style={{ color: '#f59e0b' }} />} isExpanded onClose={() => setExpandedId(null)} headerAction={cesiumDetailButton}>{widgetContents.exchange}</DashboardCard>}
                 {expandedId === 'code' && <DashboardCard id="code" title="Project Tech Stack" icon={<FaCode style={{ color: '#3178c6' }} />} isExpanded onClose={() => setExpandedId(null)}>{widgetContents.code}</DashboardCard>}
                 {expandedId === 'server' && <DashboardCard id="server" title="Server Status" icon={<FaServer style={{ color: '#e74c3c' }} />} isExpanded onClose={() => setExpandedId(null)}>{widgetContents.server}</DashboardCard>}
                 {expandedId === 'memo' && <DashboardCard id="memo" title="Memo" icon={<FaStickyNote style={{ color: '#f1c40f' }} />} isExpanded onClose={() => setExpandedId(null)}>{widgetContents.memo}</DashboardCard>}
