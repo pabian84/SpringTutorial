@@ -49,40 +49,91 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
   // Ref 초기화 (중복 업데이트 방지용)
   const lastCoords = useRef<{ lat: number; lon: number } | null>(getCachedLocation());
 
+  // 위치 감시 시작
   useEffect(() => {
     if (!navigator.geolocation) return;
+    
+    let watchId: number | null = null;
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const newLat = pos.coords.latitude;
-        const newLon = pos.coords.longitude;
+    // 위치 추적 시작 함수
+    const startWatching = () => {    
+      // 브라우저 기본 권한 처리에 위임
+      // 권한이 없으면 브라우저가 자동으로 상단에 허용/차단 팝업을 띄웁니다.
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const newLat = pos.coords.latitude;
+          const newLon = pos.coords.longitude;
 
-        // 1km 이내 이동 시 업데이트 스킵 (성능 최적화)
-        if (lastCoords.current) {
+          // 1km 이내 이동 시 업데이트 스킵 (성능 최적화)
+          if (lastCoords.current) {
             const dist = getDistanceFromLatLonInKm(lastCoords.current.lat, lastCoords.current.lon, newLat, newLon);
             if (dist < 1.0) return; 
+          }
+
+          console.log("📍 [Context] 전역 위치 업데이트됨:", newLat, newLon);
+          
+          // 상태 및 캐시 업데이트
+          lastCoords.current = { lat: newLat, lon: newLon };
+          localStorage.setItem('my_lat', newLat.toString());
+          localStorage.setItem('my_lon', newLon.toString());
+
+          setLocation({ lat: newLat, lon: newLon, loading: false, error: null });
+        },
+        (err) => {
+          console.error("GPS Error:", err);
+          // 캐시 데이터가 없는데 에러가 난 경우에만 상태 업데이트
+          if (!lastCoords.current) {
+            setLocation(prev => ({ ...prev, loading: false, error: '위치 정보 수신 실패' }));
+          }
+        },
+        // [옵션] 고정밀도, 타임아웃 30초, 캐시 안씀
+        { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+      );
+    };
+
+    // [Violation 경고 해결 로직]
+    // Permissions API를 사용하여 권한 상태를 먼저 확인합니다.
+    // 'granted'(허용됨) 상태일 때만 startWatching을 즉시 호출하여 경고를 방지합니다.
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        // granted(허용됨) 또는 prompt(대기중): 즉시 실행
+        // prompt 상태일 때 실행하면 브라우저가 자동으로 권한 요청 팝업을 띄웁니다.
+        // (콘솔에 Violation 경고가 뜨지만, 사용자 경험을 위해 감수합니다)
+        if (result.state === 'granted') {
+          // 이미 허용된 상태 -> 바로 실행 (경고 안 뜸)
+          startWatching();
+        } else if (result.state === 'denied') {
+          console.warn("⚠️ 위치 권한이 차단되어 있습니다.");
+          if (!lastCoords.current) {
+            setLocation(prev => ({ ...prev, loading: false, error: '위치 권한이 차단되었습니다.' }));
+          }
+        } else if (result.state === 'prompt') {
+          // 허용되지 않은 상태 -> 실행하지 않음 (경고 방지)
+          // 대신 사용자가 브라우저 UI에서 '허용'으로 바꾸는 순간 실행되도록 이벤트를 겁니다.
+          console.log("⚠️ 위치 권한 대기 중 (브라우저 주소창에서 허용해주세요)");
+          result.onchange = () => {
+            if (result.state === 'granted') {
+              console.log("✅ 사용자가 위치 권한을 허용했습니다. 추적 시작.");
+              startWatching();
+            } else if (result.state === 'denied') {
+              console.warn("❌ 사용자가 위치 권한을 거부했습니다.");
+              if (!lastCoords.current) {
+                setLocation(prev => ({ ...prev, loading: false, error: '위치 권한이 차단되었습니다.' }));
+              }
+            }
+          };
         }
+      });
+    } else {
+      // 구형 브라우저 등 Permissions API가 없는 경우 그냥 실행
+      startWatching();
+    }
 
-        console.log("📍 [Context] 전역 위치 업데이트됨:", newLat, newLon);
-        
-        // 상태 및 캐시 업데이트
-        lastCoords.current = { lat: newLat, lon: newLon };
-        localStorage.setItem('my_lat', newLat.toString());
-        localStorage.setItem('my_lon', newLon.toString());
-
-        setLocation({ lat: newLat, lon: newLon, loading: false, error: null });
-      },
-      (err) => {
-        console.error("GPS Error:", err);
-        // 캐시 데이터가 없는데 에러가 난 경우에만 상태 업데이트
-        if (!lastCoords.current) {
-             setLocation(prev => ({ ...prev, loading: false, error: '위치 정보 수신 실패' }));
-        }
-      },
-      { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      };
+    };
   }, []);
 
   return (

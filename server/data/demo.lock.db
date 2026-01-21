@@ -1,6 +1,6 @@
 #FileLock
-#Mon Jan 19 15:50:31 KST 2026
+#Wed Jan 21 09:57:20 KST 2026
 hostName=AST-NGW
-id=19bd504eef1d2e2340477c22b194333441e8b9cfe59
+id=19bde0e4edad5a5a4c17e98f50d787f11390810e3fa
 method=file
-server=10.10.10.183\:6193
+server=10.10.10.183\:13672

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Map, CustomOverlayMap, useMap, useKakaoLoader, MapMarker } from 'react-kakao-maps-sdk';
 import { FaMapMarkerAlt, FaPlus, FaMinus, FaCrosshairs, FaTimes } from 'react-icons/fa';
 
@@ -127,6 +127,7 @@ interface MapProps {
   lon: number;
 }
 
+// [메인 컴포넌트] 카카오 지도 위젯
 export default function KakaoMapWidget({ lat, lon }: MapProps) {
   //throw new Error("테스트용 강제 에러 발생 - 대시보드에서 에러 경계 컴포넌트 작동 확인");
   const [loading, error] = useKakaoLoader({
@@ -134,9 +135,31 @@ export default function KakaoMapWidget({ lat, lon }: MapProps) {
     libraries: ["services", "clusterer"],
   });
 
+  // 선택된 위치 정보를 저장할 state
   const [selectedInfo, setSelectedInfo] = useState<{ position: { lat: number, lng: number }, address: string } | null>(null);
+  // 지도 객체를 저장할 state
+  const [map, setMap] = useState<kakao.maps.Map | null>(null);
+  // 컨테이너 ref
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // [수정] 타입 명시: 첫 번째 인자는 지도 객체(kakao.maps.Map)입니다.
+  // 컨테이너 크기가 변하면(확장/축소) 지도를 다시 그림
+  useEffect(() => {
+    if (!map || !containerRef.current) return;
+
+    // ResizeObserver를 사용하여 div 크기 변화 감지
+    const observer = new ResizeObserver(() => {
+      map.relayout(); // [핵심] 지도 레이아웃 재계산
+      map.setCenter(new window.kakao.maps.LatLng(lat, lon)); // 중심점 유지
+    });
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [map, lat, lon]);
+
+  // 타입 명시: 첫 번째 인자는 지도 객체(kakao.maps.Map)입니다.
   const handleMapClick = (_map: kakao.maps.Map, mouseEvent: kakao.maps.event.MouseEvent) => {
     const latlng = mouseEvent.latLng;
     const geocoder = new window.kakao.maps.services.Geocoder();
@@ -152,17 +175,19 @@ export default function KakaoMapWidget({ lat, lon }: MapProps) {
     });
   };
 
+  // 로딩 및 에러 처리
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#888' }}>지도 로딩 중...</div>;
   if (error) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#ff6b6b' }}>지도 로드 실패</div>;
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
       {/* [수정] zoomControl 속성 제거 (Map 컴포넌트에 존재하지 않음) */}
       <Map
         center={{ lat, lng: lon }}
         style={{ width: '100%', height: '100%' }}
         level={3}
         onClick={handleMapClick}
+        onCreate={setMap} // 지도 생성 시 지도 객체 저장
       >
         {lat && lon && <CustomMarker lat={lat} lon={lon} />}
 
