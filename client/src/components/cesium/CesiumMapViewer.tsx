@@ -1,8 +1,8 @@
 import { Cartesian3, Viewer as CesiumViewer, Color, createWorldTerrainAsync, HeightReference, Ion, IonResource, TerrainProvider, UrlTemplateImageryProvider } from 'cesium';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { BiTargetLock } from 'react-icons/bi';
 import { Cesium3DTileset, Entity, ImageryLayer, Viewer, type CesiumComponentRef } from 'resium';
-import { useCesiumCamera } from '../../contexts/CesiumCameraContext';
+import { useCesiumCamera, WidgetContext } from '../../contexts/CesiumCameraContext';
 import { useUserLocation } from '../../contexts/UserLocationContext';
 import { showToast } from '../../utils/alert';
 
@@ -24,7 +24,7 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
   const { saveCameraView, restoreCameraView, cameraView } = useCesiumCamera();
   const { lat: userLat, lon: userLon } = useUserLocation(); // 내 위치 정보 가져오기
   const hasFlownToUser = useRef(false); // 초기 자동 이동 여부 체크
-
+  const { isAnimating } = useContext(WidgetContext);
   // 로딩 상태 관리
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -36,7 +36,7 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
   // creditContainer를 메모제이션하여 뷰어 재생성(파괴) 방지
   const creditContainer = useMemo(() => document.createElement("div"), []);
 
-  // [복구] 랜드마크: 내 위치 + 서울 (원본 로직 복구)
+  // 랜드마크: 내 위치 + 서울 (원본 로직 복구)
   const landmarks = useMemo(() => {
     const list = [
       { name: "Seoul", lon: 126.9780, lat: 37.5665, color: Color.RED },
@@ -319,7 +319,8 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
           creditContainer={creditContainer} // 로고 숨김
           terrainProvider={terrainProvider} // 로드된 지형 적용
           requestRenderMode={true}
-          maximumRenderTimeChange={ Infinity }
+          maximumRenderTimeChange={Infinity}
+          useDefaultRenderLoop={!isAnimating}
         >
           {/* 리소스 로드 완료 후에만 내부 요소 렌더링 (깜빡임 방지) */}
           {isLoaded && terrainProvider && (

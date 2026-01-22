@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-ro
 import { useConnection } from './hooks/useConnection';
 import CesiumDetail from './pages/CesiumDetail';
 import Dashboard from './pages/Dashboard';
+import DashboardBackup  from './pages/Dashboard-backup';
 import Login from './pages/Login';
 import UserDetail from './pages/UserDetail';
 import WeatherDetail from './pages/WeatherDetail';
@@ -32,6 +33,7 @@ function AppContent() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/Dashboard-backup" element={<DashboardBackup />} />
       <Route path="/user/:userId" element={<UserDetail />} />
       <Route path="/weather" element={<WeatherDetail />} />
       <Route path="/cesium" element={<CesiumDetail />} />

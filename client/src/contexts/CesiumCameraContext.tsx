@@ -28,3 +28,8 @@ export const useCesiumCamera = (): CesiumCameraContextType => {
   }
   return context;
 };
+
+// 자식 컴포넌트(Cesium 등)와 상태를 공유하기 위한 Context
+export const WidgetContext = createContext<{ isAnimating: boolean; isExpanded: boolean; }>({
+  isAnimating: false, isExpanded: false,
+});

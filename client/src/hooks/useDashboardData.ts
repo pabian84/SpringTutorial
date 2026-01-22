@@ -41,8 +41,9 @@ export const useDashboardData = () => {
     queryKey: ['exchangeData'],
     queryFn: async () => {
       const res = await axios.get<StockDTO[]>('/api/finance/dashboard');
-      return res.data;
+      return res.data as StockDTO[];
     },
+    staleTime: 1000 * 60 // 1분 캐시
   });
 
   // 4. 코드 통계 데이터
@@ -57,6 +58,7 @@ export const useDashboardData = () => {
       chartData.sort((a, b) => b.value - a.value);
       return chartData as CodeData[];
     },
+    staleTime: 1000 * 60 * 10 // 10분 캐시
   });
 
   // 5. 메모 데이터
