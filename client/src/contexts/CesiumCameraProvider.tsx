@@ -1,12 +1,13 @@
 import React, { useCallback, useRef } from 'react';
 import type { Viewer } from 'cesium';
-import { Cartesian3 } from 'cesium';
-// 위에서 만든 로직 파일 임포트
+import { Cartesian3, Math as CesiumMath } from 'cesium';
 import { CesiumCameraContext, type CameraView } from './CesiumCameraContext';
 
 export const CesiumCameraProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const cameraView = useRef<CameraView | null>(null);
+  const viewerRef = useRef<Viewer | null>(null);
 
+  // 카메라 상태 저장
   const saveCameraView = useCallback((viewer: Viewer) => {
     if (!viewer || !viewer.camera) return;
 
@@ -27,6 +28,7 @@ export const CesiumCameraProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
+  // 카메라 상태 복구
   const restoreCameraView = useCallback((viewer: Viewer) => {
     if (!viewer || !viewer.camera || !cameraView.current) return;
 
@@ -42,8 +44,30 @@ export const CesiumCameraProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
   }, []);
 
+  //  Viewer 인스턴스 설정 함수
+  const setViewer = useCallback((viewer: Viewer) => {
+    viewerRef.current = viewer;
+  }, []);
+
+  // 특정 좌표로 이동하는 flyTo 함수 구현
+  const flyTo = useCallback((lat: number, lon: number, height: number, pitch: number = -45) => {
+    if (viewerRef.current && viewerRef.current.camera) {
+      viewerRef.current.camera.flyTo({
+        destination: Cartesian3.fromDegrees(lon, lat, height),
+        orientation: {
+          heading: 0.0,
+          pitch: CesiumMath.toRadians(pitch),
+          roll: 0.0,
+        },
+        duration: 2.0, // 이동 시간 2초
+      });
+    } else {
+        console.warn("Cesium Viewer instance is not set.");
+    }
+  }, []);
+
   return (
-    <CesiumCameraContext.Provider value={{ cameraView, saveCameraView, restoreCameraView }}>
+    <CesiumCameraContext.Provider value={{ cameraView, saveCameraView, restoreCameraView, setViewer, flyTo }}>
       {children}
     </CesiumCameraContext.Provider>
   );

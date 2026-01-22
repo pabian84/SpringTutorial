@@ -88,6 +88,13 @@ export interface CodeStatsDTO {
   [language: string]: number; 
 }
 
+// 코드 통계 차트용 데이터 타입
+export interface CodeData {
+  name: string;
+  value: number;
+  [key: string]: string | number; // 동적 속성 허용 (필수)
+}
+
 // 5. 서버 모니터링 시스템 메시지 대응
 export interface SystemStatusDTO {
   type: 'SYSTEM_STATUS' | 'USER_UPDATE';

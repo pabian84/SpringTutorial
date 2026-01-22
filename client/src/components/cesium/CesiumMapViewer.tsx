@@ -24,32 +24,19 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
   const { saveCameraView, restoreCameraView, cameraView } = useCesiumCamera();
   const { lat: userLat, lon: userLon } = useUserLocation(); // 내 위치 정보 가져오기
   const hasFlownToUser = useRef(false); // 초기 자동 이동 여부 체크
-  // 지형 프로바이더 상태
-  const [terrainProvider, setTerrainProvider] = useState<TerrainProvider | undefined>(undefined);
-  // 3D 건물 리소스
-  const buildingResource = useMemo(() => IonResource.fromAssetId(96188), []);
-  // creditContainer를 메모제이션하여 뷰어 재생성(파괴) 방지
-  // 이걸 안 하면 렌더링될 때마다 새로운 div가 생성되어 뷰어가 계속 터집니다.
-  const creditContainer = useMemo(() => document.createElement("div"), []);
-  // 구름 레이어 설정
-  const [cloudProvider] = useState(() => {
-    if (!OWM_API_KEY) return null;
-    return new UrlTemplateImageryProvider({
-      url: `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`,
-      maximumLevel: 5
-    });
-  });
-  // 생성 확인 로그
-  // Strict Mode 중복 로그 방지용 Ref
-  const hasLoggedCloud = useRef(false);
-  useEffect(() => {
-    if (cloudProvider && !hasLoggedCloud.current) {
-      console.log("Cloud Provider Initialized");
-      hasLoggedCloud.current = true;
-    }
-  }, [cloudProvider]);
 
-  // 랜드마크: 내 위치 + 서울
+  // 로딩 상태 관리
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // 리소스 상태 (병렬 로딩 결과 저장용)
+  const [terrainProvider, setTerrainProvider] = useState<TerrainProvider | undefined>(undefined);
+  const [buildingResource, setBuildingResource] = useState<IonResource | null>(null);
+  const [cloudProvider, setCloudProvider] = useState<UrlTemplateImageryProvider | null>(null);
+
+  // creditContainer를 메모제이션하여 뷰어 재생성(파괴) 방지
+  const creditContainer = useMemo(() => document.createElement("div"), []);
+
+  // [복구] 랜드마크: 내 위치 + 서울 (원본 로직 복구)
   const landmarks = useMemo(() => {
     const list = [
       { name: "Seoul", lon: 126.9780, lat: 37.5665, color: Color.RED },
@@ -61,30 +48,52 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
     return list;
   }, [userLat, userLon]);
 
-  // 지형 로드 (3D 건물을 위해 필수)
+  // 리소스 병렬 로딩 (Promise.all 적용)
   useEffect(() => {
     let isMounted = true;
-    const loadTerrain = async () => {
+
+    const loadResources = async () => {
       try {
-        const terrain = await createWorldTerrainAsync({
+        // [핵심] 지형, 건물, 구름을 동시에 로드하여 속도 향상 및 덜컥거림 방지
+        const [terrain, buildings, clouds] = await Promise.all([
+          createWorldTerrainAsync({
             requestWaterMask: true,
             requestVertexNormals: true
-        });
-        if (!isMounted) return; // 언마운트 되었으면 중단
+          }),
+          IonResource.fromAssetId(96188),
+          new UrlTemplateImageryProvider({
+            url: `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${OWM_API_KEY}`,
+            maximumLevel: 5
+          })
+        ]);
 
-        console.log("지형 로드 성공");
+        if (!isMounted) return;
+
+        // 상태 일괄 업데이트
         setTerrainProvider(terrain);
-
-        // 리액트 상태 업데이트와 별개로, 뷰어 엔진에 직접 지형을 꽂아넣음
+        setBuildingResource(buildings);
+        setCloudProvider(clouds);
+        
+        // [중요] 뷰어 엔진에 지형 직접 주입 (이게 없으면 지형 로드 안됨)
         if (viewerRef.current && !viewerRef.current.isDestroyed()) {
           viewerRef.current.scene.terrainProvider = terrain;
           console.log("✅ 뷰어에 지형 강제 주입 완료");
         }
+
+        // [추가] 자연스러운 전환 (안정화 대기 후 로딩 해제)
+        setTimeout(() => {
+          if (isMounted) setIsLoaded(true);
+        }, 1200);
+
       } catch (e) {
-        console.warn("지형 로드 실패:", e);
+        console.warn("리소스 로드 실패:", e);
+        // 에러가 나더라도 화면은 보여줘야 함
+        if (isMounted) setIsLoaded(true);
       }
     };
-    loadTerrain();
+
+    loadResources();
+
     return () => {
       isMounted = false;
     }
@@ -98,12 +107,11 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
     }
   }, [saveCameraView]);
 
-  // 내 위치로 이동하는 공통 함수 (버튼 및 홈 버튼용)
+  // 내 위치로 이동하는 공통 함수 (버튼 및 홈 버튼용) - [복구]
   const flyToUser = useCallback(() => {
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed()) return;
     
-    // 타입 가드: null이 아닐 때만 실행
     if (userLat !== null && userLon !== null) {
       viewer.camera.flyTo({
         destination: Cartesian3.fromDegrees(userLon, userLat, 3000),
@@ -114,21 +122,18 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
     }
   }, [userLat, userLon]);
 
-  // Ref Callback으로 초기화 로직 이동 (onReady 대체)
-  // 이 함수는 뷰어가 DOM에 붙을 때 딱 한 번 실행됩니다.
+  // Ref Callback으로 초기화 로직 (onReady 대체)
   const initViewer = useCallback(
     (ref: CesiumComponentRef<CesiumViewer> | null) => {
       if (ref?.cesiumElement) {
         const viewer = ref.cesiumElement;
-        viewerRef.current = viewer; // Ref에 저장 (상태 업데이트 아님)
+        viewerRef.current = viewer; 
 
         try {
-          // 지형에 파묻힘 방지 (마커가 땅속에 있어도 보이게 함)
+          // 지형에 파묻힘 방지
           viewer.scene.globe.depthTestAgainstTerrain = false;
 
-          // [핵심 수정] 홈 버튼의 동작을 근본적으로 교체 (Override)
-          // 이벤트 리스너 방식이 아니라, 홈 버튼이 호출하는 함수 자체를 덮어씁니다.
-          // 이것이 Cesium에서 홈 동작을 바꾸는 가장 확실한 정석(Global Override)입니다.
+          // 홈 버튼 동작 오버라이딩 (내 위치로 이동)
           if (viewer.camera) {
             viewer.camera.flyHome = (duration) => {
               if (userLat !== null && userLon !== null) {
@@ -142,37 +147,32 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
             };
           }
 
-          // [핵심 수정] 홈 버튼 오버라이딩을 initViewer 내부로 이동
-          // 뷰어가 생성되자마자 리스너를 붙여야 동작이 확실합니다.
+          // 홈 버튼 리스너 등록
           if (viewer.homeButton) {
             const viewModel = viewer.homeButton.viewModel;
-            // 기존 리스너가 있다면 정리 (안전장치)
             if (viewModel.command.beforeExecute) {
-               // beforeExecute에 직접 함수를 연결하여 가로챕니다.
                viewModel.command.beforeExecute.addEventListener((e) => {
-                  e.cancel = true; // 기본 동작(북미 이동) 취소
-                  flyToUser();  // 내 위치로 이동
+                  e.cancel = true; 
+                  flyToUser();  
                });
             }
           }
 
-          // 1. 카메라 위치 복구
-          // 카드 <-> 확장 전환 시 여기서 저장된 위치를 즉시 복구하여 끊김 없는 경험 제공
+          // 카메라 위치 복구 또는 초기 이동
           if (cameraView.current) {
             restoreCameraView(viewer);
-            hasFlownToUser.current = true; // 저장된 뷰가 있으면 자동 이동 스킵
+            hasFlownToUser.current = true; 
           } else if (userLat && userLon) {
-            // 초기화 시점에 이미 내 위치가 있으면 바로 이동
             flyToUser();
             hasFlownToUser.current = true;
           } else {
-            // 위치 로딩 전 기본값 (서울)
+            // 기본 위치 (서울)
             viewer.camera.setView({
               destination: Cartesian3.fromDegrees(126.978, 37.5665, 20000000),
             });
           }
 
-          // 이벤트 리스너 등록 (중복 방지 위해 먼저 제거 시도)
+          // 이동 종료 이벤트 등록
           viewer.camera.moveEnd.removeEventListener(handleMoveEnd);
           viewer.camera.moveEnd.addEventListener(handleMoveEnd);
 
@@ -181,19 +181,16 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
           console.warn('Viewer Init Error:', e);
         }
       } else {
-        // 언마운트 시: Ref 비우기
-        // (Cesium이 파괴되면서 리스너도 날아가므로 별도 해제 불필요)
         viewerRef.current = null;
       }
     },
     [cameraView, restoreCameraView, handleMoveEnd, userLat, userLon, flyToUser]
   );
 
-  // 위치 정보가 나중에 로드되었을 때 자동으로 이동 (초기 1회, 위치 정보가 늦게 들어올 경우 대비)
+  // 위치 정보 로드 시 자동 이동 (초기 1회)
   useEffect(() => {
     const viewer = viewerRef.current;
     if (viewer && !viewer.isDestroyed() && userLat !== null && userLon !== null) {
-      // 저장된 뷰가 없고, 아직 이동한 적이 없다면 내 위치로 비행
       if (!cameraView.current && !hasFlownToUser.current) {
         flyToUser();
         hasFlownToUser.current = true;
@@ -201,24 +198,21 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
     }
   }, [userLat, userLon, cameraView, flyToUser]);
 
-  // Home 버튼 클릭 시 '내 위치'로 돌아오도록 동작 오버라이딩
+  // Home 버튼 동작 갱신
   useEffect(() => {
     const viewer = viewerRef.current;
     if (viewer && !viewer.isDestroyed() && userLat !== null && userLon !== null) {
-      // 위치 정보가 업데이트되면 flyHome 함수도 최신 좌표를 쓰도록 갱신
       viewer.camera.flyHome = () => {
         flyToUser();
       };
     }
-  }, [userLat, userLon, flyToUser]); // 위치가 바뀌면 홈 버튼 동작도 갱신
+  }, [userLat, userLon, flyToUser]);
 
-  // 컴포넌트가 사라질 때 리스너를 확실하게 제거 (안전장치)
+  // 언마운트 시 정리
   useEffect(() => {
     return () => {
       const viewer = viewerRef.current;
       if (viewer && !viewer.isDestroyed()) {
-        // [UX 개선] 컴포넌트가 Unmount 될 때(카드 -> 확장 전환 시) 현재 카메라 위치를 강제로 저장
-        // 이렇게 해야 다시 Mount 될 때 initViewer에서 restoreCameraView가 정확한 최신 위치를 잡습니다.
         saveCameraView(viewer);
         viewer.camera.moveEnd.removeEventListener(handleMoveEnd);
       }
@@ -239,10 +233,39 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
         </div>
       )}
 
-      {/* 외부에서 주입된 버튼(상세보기 등) 렌더링 */}
+      {/* 스켈레톤 UI (로딩 화면) */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundColor: '#1e1e1e', // 대시보드 테마와 일치
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 20,
+          opacity: isLoaded ? 0 : 1, // 로딩 완료 시 투명화
+          transition: 'opacity 0.8s ease-out', // 자연스러운 전환
+          pointerEvents: isLoaded ? 'none' : 'auto',
+        }}
+      >
+        <div style={{ color: '#4facfe', fontSize: '16px', fontWeight: 'bold', marginBottom: '15px' }}>
+          Loading 3D Earth...
+        </div>
+        <div style={{
+          width: '30px', height: '30px',
+          border: '3px solid rgba(255,255,255,0.1)',
+          borderTop: '3px solid #4facfe',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+      </div>
+
+      {/* 외부 버튼 */}
       {children}
 
-      {/* 내 위치 이동 버튼(홈 버튼 대체) */}
+      {/* 내 위치 이동 버튼(로딩 중에는 숨김 처리 추가) */}
       <button
         onClick={flyToUser}
         title="내 위치로 이동"
@@ -262,65 +285,82 @@ export const CesiumMapViewer: React.FC<CesiumMapViewerProps> = ({ children, full
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '20px',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
+          boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
+          // 로딩 중에는 버튼도 숨김
+          opacity: isLoaded ? 1 : 0,
+          transition: 'opacity 0.8s ease-in',
+          pointerEvents: isLoaded ? 'auto' : 'none'
         }}
       >
         <BiTargetLock />
       </button>
-      <Viewer
-        ref={initViewer} // Ref Callback으로 초기화
-        full={full} // 전체화면 모드 전달
-        timeline={false}
-        animation={false}
-        baseLayerPicker={full}
-        geocoder={full}
-        homeButton={full}
-        infoBox={full} // 정보 박스 비활성화 (클릭 시 멈춤 방지)
-        navigationHelpButton={full}
-        sceneModePicker={full}
-        selectionIndicator={full} // 선택 표시기 비활성화
-        fullscreenButton={false}
-        creditContainer={creditContainer} // 로고 숨김
-        terrainProvider={terrainProvider}
-        requestRenderMode={true}
-        maximumRenderTimeChange={ Infinity }
-      >
-        {/* 3. 순차 로드 구현: terrainProvider가 있을 때만 아래 요소들을 렌더링함 */}
-        {terrainProvider && (
-          <>
-            {/* 구름 */}
-            {cloudProvider && <ImageryLayer imageryProvider={cloudProvider} alpha={0.8} />}
-            
-            {/* 3D 건물 */}
-            <Cesium3DTileset url={buildingResource}
-              skipLevelOfDetail={true}     // 뷰에 안 보이는 디테일 건너뜀 (로딩 속도 향상)
-              maximumScreenSpaceError={16}
-             />
 
-            {/* 마커 */}
-            {landmarks.map((mark, idx) => (
-              <Entity
-                key={idx}
-                name={mark.name}
-                description={`
-                  <div style="padding: 10px; color: black;">
-                    <h3>${mark.name}</h3>
-                    <p>Latitude: ${mark.lat}</p>
-                    <p>Longitude: ${mark.lon}</p>
-                  </div>
-                `}
-                position={Cartesian3.fromDegrees(mark.lon, mark.lat)}
-                point={{ 
-                  pixelSize: 15, 
-                  color: mark.color,
-                  heightReference: HeightReference.CLAMP_TO_GROUND,
-                  disableDepthTestDistance: 2000000,
-                }}
-              />
-            ))}
-          </>
-        )}
-      </Viewer>
+      {/* 뷰어 래퍼 (Fade In 효과 추가) */}
+      <div style={{ 
+        width: '100%', 
+        height: '100%', 
+        opacity: isLoaded ? 1 : 0, 
+        transition: 'opacity 0.8s ease-in' 
+      }}>
+        {/* 원본 Viewer 속성 및 순서 100% 유지 */}
+        <Viewer
+          ref={initViewer} // Ref Callback으로 초기화
+          full={full} // 전체화면 모드 전달
+          timeline={false}
+          animation={false}
+          baseLayerPicker={full}
+          geocoder={full}
+          homeButton={full}
+          infoBox={full} // 정보 박스 비활성화 (클릭 시 멈춤 방지)
+          navigationHelpButton={full}
+          sceneModePicker={full}
+          selectionIndicator={full} // 선택 표시기 활성화
+          fullscreenButton={false}
+          creditContainer={creditContainer} // 로고 숨김
+          terrainProvider={terrainProvider} // 로드된 지형 적용
+          requestRenderMode={true}
+          maximumRenderTimeChange={ Infinity }
+        >
+          {/* 리소스 로드 완료 후에만 내부 요소 렌더링 (깜빡임 방지) */}
+          {isLoaded && terrainProvider && (
+            <>
+              {/* 구름 */}
+              {cloudProvider && <ImageryLayer imageryProvider={cloudProvider} alpha={0.8} />}
+              
+              {/* 3D 건물 */}
+              {buildingResource && (
+                <Cesium3DTileset 
+                  url={buildingResource}
+                  skipLevelOfDetail={true}
+                  maximumScreenSpaceError={16}
+                />
+              )}
+
+              {/* 마커 - [복구] 원본 로직(서울+내위치) 적용 */}
+              {landmarks.map((mark, idx) => (
+                <Entity
+                  key={idx}
+                  name={mark.name}
+                  description={`
+                    <div style="padding: 10px; color: black;">
+                      <h3>${mark.name}</h3>
+                      <p>Latitude: ${mark.lat}</p>
+                      <p>Longitude: ${mark.lon}</p>
+                    </div>
+                  `}
+                  position={Cartesian3.fromDegrees(mark.lon, mark.lat)}
+                  point={{ 
+                    pixelSize: 15, 
+                    color: mark.color,
+                    heightReference: HeightReference.CLAMP_TO_GROUND,
+                    disableDepthTestDistance: 2000000,
+                  }}
+                />
+              ))}
+            </>
+          )}
+        </Viewer>
+      </div>
     </div>
   );
 };

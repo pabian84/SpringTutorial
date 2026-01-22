@@ -12,6 +12,9 @@ export interface CesiumCameraContextType {
   cameraView: React.RefObject<CameraView | null>;
   saveCameraView: (viewer: Viewer) => void;
   restoreCameraView: (viewer: Viewer) => void;
+  // Viewer 인스턴스 설정 및 카메라 이동 함수 타입 정의
+  setViewer: (viewer: Viewer) => void;
+  flyTo: (lat: number, lon: number, height: number, pitch?: number) => void;
 }
 
 // Context 생성

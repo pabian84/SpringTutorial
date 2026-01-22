@@ -1,16 +1,11 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import type { CodeData } from '../types/dtos';
 
 // 언어별 브랜드 컬러 (Java:빨강, TS:파랑, CSS:하늘색, 기타:회색)
 const COLORS = ['#ea2d2e', '#3178c6', '#2965f1', '#999999'];
 
-// 외부에서 사용할 수 있도록 export
-export interface CodeData {
-  name: string;
-  value: number;
-  [key: string]: string | number;
-}
 interface ChartProps {
   data: CodeData[];
 }
