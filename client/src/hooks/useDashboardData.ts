@@ -192,7 +192,7 @@ export const useDashboardData = () => {
     } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('myId');
-      showToast('로그아웃 되었습니다.');
+      showToast('로그아웃 되었습니다');
       navigate('/');
     }
   };

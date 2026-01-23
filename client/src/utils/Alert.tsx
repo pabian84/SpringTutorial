@@ -1,4 +1,6 @@
+import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
+import { AnimatedErrorIcon, AnimatedInfoIcon, AnimatedSuccessIcon, AnimatedWarningIcon } from '../components/common/ToastIcons';
 
 // 1. 다크 모드용 기본 색상 설정
 const commonConfig = {
@@ -49,9 +51,28 @@ const Toast = Swal.mixin({
   }
 });
 
-export const showToast = (title: string, icon: 'success' | 'error' | 'info' = 'info') => {
+export const showToast1 = (title: string, icon: 'success' | 'error' | 'warning' | 'info' = 'info') => {
   Toast.fire({
     icon,
     title
   });
+};
+
+export const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+  switch (type) {
+    case 'success':
+      // 기본 toast.success 대신 커스텀 아이콘 주입
+      toast(message, { icon: <AnimatedSuccessIcon /> });
+      break;
+    case 'error':
+      toast(message, { icon: <AnimatedErrorIcon /> });
+      break;
+    case 'warning':
+      toast(message, { icon: <AnimatedWarningIcon /> });
+      break;
+    case 'info':
+    default:
+      toast(message, { icon: <AnimatedInfoIcon /> });
+      break;
+  }
 };
