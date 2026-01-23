@@ -1,11 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-
-// [원본 Dashboard.tsx 호환성] legacy 경로의 WidthProvider 사용
-// 원본 파일이 이 방식을 사용하여 잘 작동했으므로, 똑같이 유지합니다.
-import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
-
 import DeferredComponent from './DeferredComponent';
 import WidgetCard from './WidgetCard';
 
@@ -14,12 +10,12 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 
 // [Type Safety] 라이브러리 타입 추출 (Any 방지)
 type ResponsiveProps = React.ComponentProps<typeof ResponsiveGridLayout>;
-type RGL_Layouts = ResponsiveProps['layouts'];
+export type RGL_Layouts = ResponsiveProps['layouts'];
 
 /**
  * 대시보드 위젯 설정 인터페이스
  */
-export interface DashboardWidgetConfig {
+export interface WidgetConfig {
   id: string;
   title?: string;
   icon?: React.ReactNode;
@@ -34,16 +30,17 @@ export interface DashboardWidgetConfig {
   delay?: number;
 }
 
-interface DashboardGridProps {
+interface WidgetdGridLayoutProps {
   layouts: RGL_Layouts;
-  widgets: DashboardWidgetConfig[];
+  widgets: WidgetConfig[];
+  onLayoutChange?: (layouts: RGL_Layouts) => void;
 }
 
 /**
  * [DashboardGrid]
  * react-grid-layout 설정을 캡슐화하여 DashboardNew.tsx를 깔끔하게 유지합니다.
  */
-export default function DashboardGrid({ layouts, widgets }: DashboardGridProps) {
+export default function WidgetGridLayout({ layouts, widgets, onLayoutChange }: WidgetdGridLayoutProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -125,6 +122,11 @@ export default function DashboardGrid({ layouts, widgets }: DashboardGridProps) 
           useCSSTransforms={true} // 성능 향상
           isBounded={true} // 그리드 밖으로 못 나가게
           measureBeforeMount={false} // 미리 측정하지 않음
+          onLayoutChange={(_currentLayout, allLayouts) => {
+            if (onLayoutChange) {
+              onLayoutChange(allLayouts);
+            }
+          }}
         >
           {widgets.map((widget) => (
             // [구조 유지] Grid Item -> Wrapper -> Card 구조 유지
