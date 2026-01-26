@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 import { BiDetail } from 'react-icons/bi';
-import { FaChartLine, FaCode, FaComments, FaCube, FaGlobeAsia, FaMapMarkedAlt, FaServer, FaStickyNote } from 'react-icons/fa';
+import { FaChartLine, FaCode, FaComments, FaCube, FaDesktop, FaGlobeAsia, FaMapMarkedAlt, FaServer, FaSignOutAlt, FaStickyNote } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import CesiumWidget from '../components/cesium/CesiumWidget';
 import ChatWidget from '../components/ChatWidget';
 import CodeStatsWidget from '../components/CodeStatsWidget';
-import WidgetGridLayout, { type WidgetConfig, type RGL_Layouts } from '../components/common/WidgetGridLayout';
+import WidgetGridLayout, { type RGL_Layouts, type WidgetConfig } from '../components/common/WidgetGridLayout';
 import ExchangeWidget from '../components/ExchangeWidget';
 import KakaoMapWidget from '../components/KakaoMapWidget';
 import MemoWidget from '../components/MemoWidget';
@@ -242,8 +242,35 @@ export default function Dashboard() {
           <h1 style={{ margin: 0, fontSize: '24px' }}>Smart Dashboard</h1>
           <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>Logged in as {myId}</span>
         </div>
-        <div style={{ alignContent: 'center' }}>
-          <button onClick={handleLogout} style={{ width: 'auto', height: '75%', padding: '5px 10px', fontSize: '14px' }}>System Logout</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button 
+            onClick={() => navigate('/devices')} 
+            style={{ 
+              width: 'auto', 
+              height: '75%', 
+              padding: '5px 10px', 
+              fontSize: '14px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              backgroundColor: '#214372', // 회색 계열 (구분감)
+            }}
+            title="로그인된 기기 관리"
+          >
+            <FaDesktop size={16} />
+            기기 관리
+          </button>
+          <button onClick={handleLogout}
+            style={{
+              width: 'auto', height: '75%', padding: '5px 10px', fontSize: '14px',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+            }}
+          >
+            <FaSignOutAlt size={16} />
+            System Logout
+          </button>
         </div>
       </header>
 

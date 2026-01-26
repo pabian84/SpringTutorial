@@ -57,6 +57,20 @@ CREATE TABLE if not exists chat_log (
     FOREIGN KEY (sender_id) REFERENCES users(id)
 );
 
+-- 기기 관리용 세션 테이블
+CREATE TABLE if not exists user_sessions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    refresh_token VARCHAR(512) NOT NULL, -- 토큰으로 기기 식별
+    device_type VARCHAR(50),             -- desktop, mobile 등
+    user_agent VARCHAR(255),             -- 브라우저 정보
+    ip_address VARCHAR(50),
+    location VARCHAR(100),
+    last_accessed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- [초기 데이터] 관리자 계정 (비밀번호: 1234 -> BCrypt로 암호화된 값)
 -- $2a$10$hjBO1B8SB4uKJpnSBk9vluUsMAxe44n7CAwQ4ijHOrAdWAwqMxo.e
 -- INSERT INTO users (id, name, password, role) VALUES ('admin', '관리자', '$2a$10$hjBO1B8SB4uKJpnSBk9vluUsMAxe44n7CAwQ4ijHOrAdWAwqMxo.e', 'ADMIN');

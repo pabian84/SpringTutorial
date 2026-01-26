@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ChatHistoryDTO, CodeData, MemoDTO, StockDTO, SystemStatusDTO, UserDTO } from '../types/dtos';
-import { showConfirm, showToast } from '../utils/alert';
+import { showConfirm, showToast } from '../utils/Alert';
 
 const WS_URL = import.meta.env.VITE_WS_URL;
 

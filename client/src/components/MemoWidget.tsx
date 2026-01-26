@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import type { MemoDTO } from '../types/dtos';
-import { showConfirm, showToast } from '../utils/alert';
+import { showConfirm, showToast } from '../utils/Alert';
 
 // 부모(Dashboard)로부터 받을 Props 정의
 interface MemoWidgetProps {

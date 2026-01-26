@@ -1,5 +1,5 @@
 import axios, { AxiosHeaders } from 'axios';
-import { showToast } from './alert';
+import { showToast } from './Alert';
 
 // 토큰 갱신 중인지 확인하는 플래그
 let isRefreshing = false;

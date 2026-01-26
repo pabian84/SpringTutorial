@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { FaChrome, FaDesktop, FaEdge, FaFirefox, FaMobileAlt, FaQuestionCircle, FaSafari } from 'react-icons/fa';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { AccessLogDTO } from '../types/dtos';
-import { showAlert } from '../utils/alert';
+import { showAlert } from '../utils/Alert';
 
 export default function UserDetail() {
   const { userId } = useParams();

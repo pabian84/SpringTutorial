@@ -17,7 +17,9 @@ import com.example.demo.domain.user.dto.UserLoginReq;
 import com.example.demo.domain.user.dto.UserRes;
 import com.example.demo.domain.user.entity.AccessLog;
 import com.example.demo.domain.user.entity.User;
+import com.example.demo.domain.user.entity.UserSession;
 import com.example.demo.domain.user.mapper.UserMapper;
+import com.example.demo.domain.user.mapper.UserSessionMapper;
 import com.example.demo.global.security.JwtTokenProvider;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import lombok.extern.slf4j.Slf4j; // [추가 1] 로그 기능 임포트
 @RequiredArgsConstructor
 public class UserService {
     private final UserMapper userMapper;
+    private final UserSessionMapper sessionMapper;
     private final PasswordEncoder passwordEncoder; // 암호화 기계
     private final JwtTokenProvider jwtTokenProvider; // 토큰 발급기
 
@@ -59,9 +62,9 @@ public class UserService {
             }
 
             // 7일 후 만료
-            Timestamp expiry = new Timestamp(System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000));
+            //Timestamp expiry = new Timestamp(System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000));
             // DB 저장
-            userMapper.saveRefreshToken(user.getId(), refreshToken, ip, browser, os, expiry);
+            //userMapper.saveRefreshToken(user.getId(), refreshToken, ip, browser, os, expiry);
 
             // 4. 로그 및 상태 업데이트
             userMapper.updateStatus(user.getId(), true);
@@ -76,6 +79,18 @@ public class UserService {
                     .type("LOGIN")
                     .build();
             userMapper.saveLog(logData);
+
+            // 로그인 성공 시 세션 정보 DB에 저장
+            UserSession session = UserSession.builder()
+                .userId(user.getId()) // User 객체 대신 ID String 사용
+                .refreshToken(refreshToken)
+                .deviceType(detectDeviceType(userAgent))
+                .userAgent(userAgent)
+                .ipAddress(ip)
+                .location("Unknown")
+                .build(); // createdAt 등은 DB에서 NOW()로 처리하거나 여기서 넣거나
+
+            sessionMapper.insertSession(session);
 
             // 컨트롤러에게 토큰을 넘겨줍니다.
             result.put("status", "ok");
@@ -95,7 +110,8 @@ public class UserService {
     public void logout(String userId, String refreshToken) {
         // 1. DB에서 해당 기기의 리프레시 토큰만 삭제
         if (refreshToken != null) {
-            userMapper.deleteRefreshToken(refreshToken);
+            //userMapper.deleteRefreshToken(refreshToken);
+            sessionMapper.deleteByRefreshToken(refreshToken); // user_sessions에서 삭제
         }
         
         // [중요] 여기서 updateStatus(false)를 하지 않습니다!
@@ -115,7 +131,7 @@ public class UserService {
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
     public void logoutAllDevices(String userId) {
-        userMapper.deleteAllRefreshTokens(userId); // 토큰 삭제 (로그아웃 핵심)
+        sessionMapper.deleteByUserId(userId);
         userMapper.updateStatus(userId, false); // 상태 오프라인 처리
         
         // 로그 기록 (약식)
@@ -178,14 +194,15 @@ public class UserService {
             throw new RuntimeException("Invalid Refresh Token");
         }
 
-        // 2. 토큰에서 사용자 ID 추출
-        Authentication auth = jwtTokenProvider.getAuthentication(refreshToken);
-        String userId = auth.getName();
-
-        // 3. (선택) DB에 저장된 리프레시 토큰과 일치하는지, 만료 안 됐는지 더블 체크
-        // (여기서는 간단하게 JWT 유효성만으로 처리하지만, 보안을 높이려면 DB 조회 로직 추가 권장)
+        // 2. [추가] DB(user_sessions)에 해당 토큰이 살아있는지 확인!
+        // 화면에서 '로그아웃' 버튼을 눌러 DB에서 삭제했다면, 여기서 null이 나와서 튕겨내야 합니다.
+        UserSession session = sessionMapper.findByRefreshToken(refreshToken);
+        if (session == null) {
+            throw new RuntimeException("Session Expired or Logged Out"); // 여기서 401/403 발생 -> 프론트가 튕겨냄
+        }
 
         // 4. 새 액세스 토큰 발급
+        String userId = session.getUserId();
         String newAccessToken = jwtTokenProvider.createAccessToken(userId);
 
         Map<String, Object> result = new HashMap<>();
@@ -195,5 +212,12 @@ public class UserService {
         log.info("새 액세스 토큰 발급 완료 for userId={}: {}", userId, newAccessToken);
         
         return result;
+    }
+
+    // 간단한 기기 판별 메서드 (UserService 내부에 추가)
+    private String detectDeviceType(String userAgent) {
+        if (userAgent.contains("Mobile")) return "mobile";
+        if (userAgent.contains("Tablet")) return "tablet";
+        return "desktop";
     }
 }

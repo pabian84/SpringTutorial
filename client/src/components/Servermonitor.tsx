@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { SystemStatusDTO } from '../types/dtos';
-import { showToast } from '../utils/alert';
+import { showToast } from '../utils/Alert';
 
 const MAX_DATA_POINTS = 20;
 const INITIAL_DATA = Array(MAX_DATA_POINTS).fill({ 

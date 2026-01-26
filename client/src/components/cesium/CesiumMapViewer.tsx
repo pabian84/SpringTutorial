@@ -4,7 +4,7 @@ import { BiTargetLock } from 'react-icons/bi';
 import { Cesium3DTileset, Entity, ImageryLayer, Viewer, type CesiumComponentRef } from 'resium';
 import { useCesiumCamera, WidgetContext } from '../../contexts/CesiumCameraContext';
 import { useUserLocation } from '../../contexts/UserLocationContext';
-import { showToast } from '../../utils/alert';
+import { showToast } from '../../utils/Alert';
 
 const OWM_API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY || 'ca34851ee681091796cf6afb5e3a27ce';
 // Cesium ion 토큰 설정 (여기에 발급받은 토큰을 넣으세요)
