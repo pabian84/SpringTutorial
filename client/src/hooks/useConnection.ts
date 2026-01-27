@@ -43,7 +43,7 @@ export const useConnection = () => {
     // (이전 소켓이 닫히는 중이거나 닫혀있으면 새로 연결)
     if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
       // 연결 시작
-      const socketUrl = `${WS_URL}/ws/connection?userId=${myId}&token=${token}}`;
+      const socketUrl = `${WS_URL}/ws/connection?userId=${myId}&token=${token}`;
       ws.current = new WebSocket(socketUrl);
       ws.current.onopen = () => console.log(`[Connection] 접속 상태 모니터링 시작: ${myId}`);
       ws.current.onerror = (error) => console.error('[Connection] WebSocket Error:', error);

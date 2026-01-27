@@ -43,8 +43,8 @@ public interface UserSessionMapper {
     void deleteById(Long id);
 
     // 5. 현재 기기 제외하고 모두 로그아웃 (핵심 기능)
-    @Delete("DELETE FROM user_sessions WHERE user_id = #{userId} AND refresh_token != #{refreshToken}")
-    void terminateOthers(@Param("userId") String userId, @Param("refreshToken") String refreshToken);
+    @Delete("DELETE FROM user_sessions WHERE user_id = #{userId} AND id != #{currentSessionId}")
+    void terminateOthers(@Param("userId") String userId, @Param("currentSessionId") Long currentSessionId);
 
     // 6. 모든 기기 로그아웃 (비번 변경, 탈퇴 등)
     @Delete("DELETE FROM user_sessions WHERE user_id = #{userId}")

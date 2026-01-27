@@ -2,6 +2,8 @@ package com.example.demo.domain.user.controller;
 
 import com.example.demo.domain.user.entity.UserSession;
 import com.example.demo.domain.user.mapper.UserSessionMapper;
+import com.example.demo.global.security.JwtTokenProvider;
+
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 public class SessionController {
 
     private final UserSessionMapper sessionMapper;
+    private final JwtTokenProvider jwtTokenProvider;
 
     // 1. 내 기기 목록 조회
     @GetMapping
@@ -54,26 +57,22 @@ public class SessionController {
     public ResponseEntity<?> revokeOtherSessions(@AuthenticationPrincipal UserDetails userDetails, HttpServletRequest request) {
         String userId = userDetails.getUsername();
         
-        // 헤더에서 토큰 추출 (Bearer 제거 등은 JwtTokenProvider 로직에 따름)
-        String token = request.getHeader("Authorization");
-        if (token != null && token.startsWith("Bearer ")) {
-            token = token.substring(7);
+        // 토큰 조회
+        String token = jwtTokenProvider.resolveToken(request);
+        if (token == null) {
+             return ResponseEntity.status(401).body("인증 토큰이 없습니다.");
         }
         
-        // 주의: 여기서는 'Refresh Token'이 아니라 현재 접속중인 'Access Token'이나 
-        // DB에 저장된 식별자를 써야 하는데, 보통 DB 세션 테이블의 refreshToken과 비교하려면
-        // 클라이언트가 Refresh Token을 같이 보내주거나, Access Token 내부에 식별자가 있어야 합니다.
-        // 편의상 여기서는 DB에 저장된 '가장 최근 세션'을 제외하거나, 
-        // 요청 시 body로 refresh token을 받는 것이 정확합니다.
+        // 헤더 대신 토큰에서 내 세션 ID 추출
+        Long currentSessionId = jwtTokenProvider.getSessionId(token);
         
-        // [임시 해결] 클라이언트가 현재 자신의 Refresh Token을 Body나 Header로 보낸다고 가정
-        String currentRefreshToken = request.getHeader("Refresh-Token"); 
-        
-        if (currentRefreshToken == null || currentRefreshToken.isEmpty()) {
-            return ResponseEntity.badRequest().body("현재 기기 식별을 위한 Refresh Token이 필요합니다.");
+        if (currentSessionId == null) {
+             return ResponseEntity.badRequest().body("현재 세션 정보를 확인할 수 없습니다.");
         }
 
-        sessionMapper.terminateOthers(userId, currentRefreshToken);
+        // DB 삭제 실행
+        sessionMapper.terminateOthers(userId, currentSessionId);
+        
         return ResponseEntity.ok("다른 모든 기기에서 로그아웃 되었습니다.");
     }
 
