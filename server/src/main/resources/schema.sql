@@ -12,31 +12,34 @@ CREATE TABLE if not exists users (
     is_online BOOLEAN DEFAULT FALSE
 );
 
+-- 기기 관리용 세션 테이블
+CREATE TABLE if not exists user_sessions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    refresh_token VARCHAR(512) NOT NULL, -- 토큰으로 기기 식별
+    device_type VARCHAR(50),             -- desktop, mobile 등
+    user_agent VARCHAR(255),             -- 브라우저 정보
+    ip_address VARCHAR(50),
+    location VARCHAR(100),
+    last_accessed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- 접속 로그 테이블 (브라우저, OS 정보 추가)
 CREATE TABLE if not exists access_log (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id VARCHAR(50),
+    session_id BIGINT,   -- 어떤 세션과 관련된 로그인지 추적 (UserSession의 ID)
     ip_address VARCHAR(50),
+    location VARCHAR(100), -- 접속 국가/도시 정보 (보안 감사용)
     user_agent VARCHAR(255),
-    browser VARCHAR(50), -- [신규] Chrome, Safari 등
-    os VARCHAR(50),      -- [신규] Windows, Mac 등
+    browser VARCHAR(50), -- Chrome, Safari 등
+    os VARCHAR(50),      -- Windows, Mac 등
     endpoint VARCHAR(100),
     type VARCHAR(50),    -- LOGIN, LOGOUT 등
     log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- 리프레시 토큰 저장소 (로그인 유지 핵심)
-CREATE TABLE if not exists refresh_token (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, -- [신규] 고유 번호 (PK)
-    user_id VARCHAR(50) NOT NULL,         -- [변경] 일반 컬럼 (중복 허용)
-    token_value VARCHAR(512) NOT NULL,  -- 리프레시 토큰 값
-    ip VARCHAR(50),
-    browser VARCHAR(50),
-    os VARCHAR(50),
-    expiration TIMESTAMP NOT NULL,      -- 만료 시간
-    -- 토큰 주인(User)이 사라지면 토큰도 같이 사라져야 함 (ON DELETE CASCADE)
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 메모 테이블
@@ -55,20 +58,6 @@ CREATE TABLE if not exists chat_log (
     message TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_id) REFERENCES users(id)
-);
-
--- 기기 관리용 세션 테이블
-CREATE TABLE if not exists user_sessions (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(50) NOT NULL,
-    refresh_token VARCHAR(512) NOT NULL, -- 토큰으로 기기 식별
-    device_type VARCHAR(50),             -- desktop, mobile 등
-    user_agent VARCHAR(255),             -- 브라우저 정보
-    ip_address VARCHAR(50),
-    location VARCHAR(100),
-    last_accessed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- [초기 데이터] 관리자 계정 (비밀번호: 1234 -> BCrypt로 암호화된 값)

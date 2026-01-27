@@ -1,6 +1,5 @@
 package com.example.demo.domain.user.service;
 
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,7 +7,6 @@ import java.util.Map;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,42 +41,19 @@ public class UserService {
         // 1. 비밀번호 검사 (BCrypt 매칭)
         if (user != null && passwordEncoder.matches(req.getPassword(), user.getPassword())) {
             
-            // 2. 토큰 2개(Access, Refresh) 발급
-            String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+            // Refresh Token 먼저 생성 (DB 저장용)
+            // Refresh Token에는 세션 ID를 안 넣어도 됩니다. (DB에 저장되니까)
             String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
-            // 3. 리프레시 토큰 DB 저장 (기기 정보 포함)
-            // 간단하게 파싱 (실무엔 라이브러리 사용 권장)
-            String browser = "Unknown";
-            String os = "Unknown";
-            if (userAgent != null) {
-                if (userAgent.contains("Chrome")) browser = "Chrome";
-                else if (userAgent.contains("Firefox")) browser = "Firefox";
-                else if (userAgent.contains("Safari")) browser = "Safari";
-                
-                if (userAgent.contains("Windows")) os = "Windows";
-                else if (userAgent.contains("Mac")) os = "Mac";
-                else if (userAgent.contains("Linux")) os = "Linux";
+            // 세션 insert 직전에 실행
+            // "이 유저의 세션이 5개를 넘어가면, 제일 오래된 거 하나 지워라"
+            List<UserSession> sessions = sessionMapper.findByUserId(user.getId());
+            if (sessions.size() >= 5) {
+                // lastAccessedAt으로 정렬되어 있다고 가정할 때, 가장 뒤(오래된) 세션 삭제
+                // 혹은 DB 쿼리로 "DELETE ... ORDER BY last_accessed_at ASC LIMIT 1" 실행
+                UserSession oldest = sessions.get(sessions.size() - 1);
+                sessionMapper.deleteById(oldest.getId());
             }
-
-            // 7일 후 만료
-            //Timestamp expiry = new Timestamp(System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000));
-            // DB 저장
-            //userMapper.saveRefreshToken(user.getId(), refreshToken, ip, browser, os, expiry);
-
-            // 4. 로그 및 상태 업데이트
-            userMapper.updateStatus(user.getId(), true);
-            // 로그 저장 객체 생성
-            AccessLog logData = AccessLog.builder()
-                    .userId(user.getId())
-                    .ipAddress(ip)
-                    .userAgent(userAgent)
-                    .browser(browser)
-                    .os(os)
-                    .endpoint("/api/user/login")
-                    .type("LOGIN")
-                    .build();
-            userMapper.saveLog(logData);
 
             // 로그인 성공 시 세션 정보 DB에 저장
             UserSession session = UserSession.builder()
@@ -91,6 +66,43 @@ public class UserService {
                 .build(); // createdAt 등은 DB에서 NOW()로 처리하거나 여기서 넣거나
 
             sessionMapper.insertSession(session);
+
+            // [확인용 로그]
+            if (session.getId() == null) {
+                log.error("CRITICAL: Session ID was NOT generated!");
+                throw new RuntimeException("Session ID generation failed");
+            }
+            
+            // 생성된 session.getId()를 가지고 Access Token 생성 (세션 바인딩)
+            // JwtTokenProvider에 createAccessToken(userId, sessionId) 메서드가 있어야 함
+            String accessToken = jwtTokenProvider.createAccessToken(user.getId(), session.getId());
+
+            // 로그 및 상태 업데이트
+            userMapper.updateStatus(user.getId(), true);
+            // 로그 저장 객체 생성
+            String browser = "Unknown";
+            String os = "Unknown";
+            if (userAgent != null) {
+                if (userAgent.contains("Chrome")) browser = "Chrome";
+                else if (userAgent.contains("Firefox")) browser = "Firefox";
+                else if (userAgent.contains("Safari")) browser = "Safari";
+                
+                if (userAgent.contains("Windows")) os = "Windows";
+                else if (userAgent.contains("Mac")) os = "Mac";
+                else if (userAgent.contains("Linux")) os = "Linux";
+            }
+            AccessLog logData = AccessLog.builder()
+                    .userId(user.getId())
+                    .sessionId(session.getId())
+                    .ipAddress(ip)
+                    .location(session.getLocation())
+                    .userAgent(userAgent)
+                    .browser(browser)
+                    .os(os)
+                    .endpoint("/api/user/login")
+                    .type("LOGIN")
+                    .build();
+            userMapper.saveLog(logData);
 
             // 컨트롤러에게 토큰을 넘겨줍니다.
             result.put("status", "ok");
@@ -201,9 +213,17 @@ public class UserService {
             throw new RuntimeException("Session Expired or Logged Out"); // 여기서 401/403 발생 -> 프론트가 튕겨냄
         }
 
+        // "토큰으로는 찾았는데, ID로는 못 찾는" 황당한 경우를 방지합니다.
+        // 필터가 findById로 검사하므로, 여기서도 똑같이 검사해서 없으면 죽여야 합니다.
+        if (sessionMapper.findById(session.getId()) == null) {
+            log.error("치명적 오류: 세션 불일치 감지 (토큰 O, ID X) - 강제 만료 처리. ID: {}", session.getId());
+            // 여기서 예외를 던지면 axiosConfig가 401로 인식하고 로그인 페이지로 보냅니다.
+            throw new RuntimeException("Session Integrity Error: ID not found"); 
+        }
+
         // 4. 새 액세스 토큰 발급
         String userId = session.getUserId();
-        String newAccessToken = jwtTokenProvider.createAccessToken(userId);
+        String newAccessToken = jwtTokenProvider.createAccessToken(userId, session.getId());
 
         Map<String, Object> result = new HashMap<>();
         result.put("status", "ok");

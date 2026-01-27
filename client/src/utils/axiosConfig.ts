@@ -53,6 +53,26 @@ export const setupAxiosInterceptors = () => {
         return Promise.reject(error);
       }
 
+      // 리프레시 요청 자체가 401(인증 실패)이면 답이 없음 -> 즉시 강제 로그아웃
+      if (originalRequest.url?.includes('/refresh') && error.response.status === 401) {
+         console.warn("[Axios] 리프레시 토큰 만료됨 -> 강제 로그아웃");
+         localStorage.clear(); // 싹 다 비움
+         window.location.href = '/'; // 로그인 페이지로 쫓아냄
+         return Promise.reject(error);
+      }
+
+      // 로그아웃 요청이 실패(401)했다? -> 이미 로그아웃 된 것임 -> 강제 이동시킴.
+      if (originalRequest.url?.includes('/logout') && error.response.status === 401) {
+         console.warn("[Axios] 로그아웃 요청 401 -> 강제 클리어 및 이동");
+         
+         localStorage.removeItem('accessToken');
+         localStorage.removeItem('refreshToken');
+         localStorage.removeItem('myId');
+         
+         window.location.href = '/'; 
+         return Promise.reject(error);
+      }
+
       // 2. 401 에러(인증 실패)가 떴는데, 아직 재시도를 안 한 요청이라면
       if (error.response && (error.response.status === 401 || error.response.status === 403) && !originalRequest._retry) {
 

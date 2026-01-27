@@ -22,6 +22,14 @@ public interface UserSessionMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id") // AI 키값 받아오기
     void insertSession(UserSession session);
 
+    // 로그인 시 중복 세션 방지를 위해 동일 UserAgent 삭제
+    @Delete("DELETE FROM user_sessions WHERE user_id = #{userId} AND user_agent = #{userAgent}")
+    void deleteByUserIdAndUserAgent(@Param("userId") String userId, @Param("userAgent") String userAgent);
+
+    // 필터에서 세션 생존 확인용
+    @Select("SELECT * FROM user_sessions WHERE id = #{id}")
+    UserSession findById(Long id);
+
     // 2. 내 기기 목록 조회
     @Select("SELECT * FROM user_sessions WHERE user_id = #{userId} ORDER BY last_accessed_at DESC")
     List<UserSession> findByUserId(String userId);
@@ -45,4 +53,8 @@ public interface UserSessionMapper {
     // 7. 특정 토큰만 로그아웃 (일반 로그아웃)
     @Delete("DELETE FROM user_sessions WHERE refresh_token = #{refreshToken}")
     void deleteByRefreshToken(@Param("refreshToken") String refreshToken);
+
+    // 마지막 접속 시간이 특정 기간(예: 30일)보다 오래된 세션 삭제
+    @Delete("DELETE FROM user_sessions WHERE last_accessed_at < DATE_SUB(NOW(), INTERVAL #{days} DAY)")
+    void deleteExpiredSessions(@Param("days") int days);
 }

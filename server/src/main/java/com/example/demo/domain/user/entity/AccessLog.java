@@ -16,7 +16,9 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 public class AccessLog {
     private Long id;
     private String userId;
+    private Long sessionId;
     private String ipAddress;
+    private String location;
     private String userAgent;
     
     // [신규] 통계 및 상세 정보를 위한 필드
