@@ -72,7 +72,7 @@ public class SessionService {
     /**
      * 내 기기 목록 조회
      */
-    public List<Map<String, Object>> getMySessions(String userId) {
+    public List<Map<String, Object>> getMySessions(String userId, Long sessionId) {
         List<Session> sessions = sessionMapper.findByUserId(userId);
 
         // 보안상 토큰은 빼고 리턴
@@ -84,6 +84,7 @@ public class SessionService {
             map.put("ipAddress", s.getIpAddress());
             map.put("location", s.getLocation() != null ? s.getLocation() : "Unknown");
             map.put("lastActive", s.getLastAccessedAt());
+            map.put("isCurrent", s.getId().equals(sessionId));
             return map;
         }).collect(Collectors.toList());
     }

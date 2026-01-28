@@ -121,7 +121,7 @@ export const useDashboardData = () => {
 
   // 7. WebSocket 연결 (Dashboard & Chat)
   useEffect(() => {
-     // 1. 토큰 확인 (토큰이 없으면 연결 시도조차 하지 않음)
+    // 1. 토큰 확인 (토큰이 없으면 연결 시도조차 하지 않음)
     const token = localStorage.getItem('accessToken');
     
     // 로그아웃 상태면 연결 끊기

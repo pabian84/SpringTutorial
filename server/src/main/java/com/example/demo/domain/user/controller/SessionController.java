@@ -50,8 +50,10 @@ public class SessionController {
 
     // 1. 내 기기 목록 조회
     @GetMapping
-    public ResponseEntity<?> getMySessions(@AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(sessionService.getMySessions(userDetails.getUsername()));
+    public ResponseEntity<?> getMySessions(@AuthenticationPrincipal UserDetails userDetails, HttpServletRequest request) {
+        String token = jwtTokenProvider.resolveToken(request);
+        Long mySessionId = (token != null) ? jwtTokenProvider.getSessionId(token) : null;
+        return ResponseEntity.ok(sessionService.getMySessions(userDetails.getUsername(), mySessionId));
     }
 
     // [1] 특정 기기 추방 -> forceDisconnectOne 호출

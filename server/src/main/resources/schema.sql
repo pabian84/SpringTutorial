@@ -1,7 +1,6 @@
 -- DROP TABLE IF EXISTS access_log;
 -- DROP TABLE IF EXISTS refresh_token;
 -- DROP TABLE IF EXISTS users;
--- DROP TABLE IF EXISTS refresh_token;
 
 -- 사용자 테이블
 CREATE TABLE if not exists users (

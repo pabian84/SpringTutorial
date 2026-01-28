@@ -22,10 +22,6 @@ public interface SessionMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id") // AI 키값 받아오기
     void insertSession(Session session);
 
-    // 로그인 시 중복 세션 방지를 위해 동일 UserAgent 삭제
-    @Delete("DELETE FROM user_sessions WHERE user_id = #{userId} AND user_agent = #{userAgent}")
-    void deleteByUserIdAndUserAgent(@Param("userId") String userId, @Param("userAgent") String userAgent);
-
     // 필터에서 세션 생존 확인용
     @Select("SELECT * FROM user_sessions WHERE id = #{id}")
     Session findBySessionId(Long id);

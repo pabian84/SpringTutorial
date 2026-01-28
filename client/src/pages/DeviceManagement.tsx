@@ -403,7 +403,7 @@ export default function DeviceManagement() {
             <p>기기 정보를 불러오는 중...</p>
           </div>
         ) : sessions.length > 0 ? (
-          sessions.map((session) => {
+          sessions.sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent)).map((session) => {
             const isCurrent = session.isCurrent;
             
             const cardStyle = isCurrent 

@@ -65,7 +65,7 @@ public class UserService {
             .build(); // createdAt 등은 DB에서 NOW()로 처리하거나 여기서 넣거나
         sessionMapper.insertSession(session);
 
-         // [확인용 로그]
+        // [확인용 로그]
         if (session.getId() == null) {
             log.error("CRITICAL: Session ID was NOT generated!");
             throw new RuntimeException("Session ID generation failed");
