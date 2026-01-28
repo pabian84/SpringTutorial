@@ -12,7 +12,7 @@ export default function UserDetail() {
 
   useEffect(() => {
     // API 호출
-    axios.get(`/api/user/logs/${userId}`)
+    axios.get(`/api/user/logs`)
          .then(res => {
             setLogs(res.data);
          })

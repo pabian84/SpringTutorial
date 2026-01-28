@@ -3,7 +3,7 @@ package com.example.demo.scheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.example.demo.domain.user.mapper.UserSessionMapper;
+import com.example.demo.domain.user.mapper.SessionMapper;
 import com.example.demo.handler.DashboardHandler;
 
 import lombok.RequiredArgsConstructor;
@@ -15,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SystemStatusScheduler {
 
     private final DashboardHandler dashboardHandler;
-    private final UserSessionMapper sessionMapper;
+    private final SessionMapper sessionMapper;
 
     // 0.5초마다 방송 버튼 누름
     @Scheduled(fixedRate = 500)

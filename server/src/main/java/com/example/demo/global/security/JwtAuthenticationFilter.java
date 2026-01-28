@@ -6,7 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.example.demo.domain.user.mapper.UserSessionMapper;
+import com.example.demo.domain.user.mapper.SessionMapper;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -20,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserSessionMapper sessionMapper; // DB 조회용
+    private final SessionMapper sessionMapper; // DB 조회용
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -43,7 +43,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return; // 여기서 끝내야 함! (더 이상 진행 X)
             }
 
-            if (sessionMapper.findById(sessionId) == null) {
+            if (sessionMapper.findBySessionId(sessionId) == null) {
                 // DB에 없으면(로그아웃 당했으면) -> 인증 실패 처리!
                 // 아무것도 안 하고 리턴하면 401 뜸 (또는 response.sendError 사용)
                 log.warn("차단됨: DB에 없는 세션입니다. (이미 로그아웃됨) - ID: {}", sessionId);

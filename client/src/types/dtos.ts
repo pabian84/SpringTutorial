@@ -7,6 +7,22 @@ export interface UserDTO {
   role: string;
 }
 
+export interface LoginResultDTO {
+  accessToken: string;
+  user: UserDTO;
+}
+
+// 기기 세션 정보 (Backend: SessionController.getMySessions)
+export interface DeviceSessionDTO {
+  id: number;
+  deviceType: string;
+  userAgent: string;
+  ipAddress: string;
+  location: string;
+  lastActive: string; // LocalDateTime string
+  isCurrent: boolean; // 내가 이 기기인지 여부
+}
+
 export interface AccessLogDTO {
   id: number;           // Long -> number
   userId: string;

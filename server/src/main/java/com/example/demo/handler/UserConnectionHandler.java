@@ -21,9 +21,9 @@ public class UserConnectionHandler extends TextWebSocketHandler {
     private final UserService userService;
     private final DashboardHandler dashboardHandler; // 모니터링 핸들러
     
-    // [핵심] 유저 ID별로 열려있는 세션들을 관리 (멀티 탭 지원)
+    // 유저 ID별로 열려있는 세션들을 관리 (멀티 탭 지원)
     // Map<UserId, Set<Session>>
-    private static final Map<String, Set<WebSocketSession>> userSessionsMap = new ConcurrentHashMap<>();
+    private final Map<String, Set<WebSocketSession>> userSessionsMap = new ConcurrentHashMap<>();
 
     public UserConnectionHandler(UserService userService, DashboardHandler systemStatusHandler) {
         this.userService = userService;
@@ -68,6 +68,58 @@ public class UserConnectionHandler extends TextWebSocketHandler {
                     dashboardHandler.broadcastUserUpdate();
                 } else {
                     log.info("탭 닫힘(여전히 접속중): {}, 남은 세션 수: {}", userId, sessions.size());
+                }
+            }
+        }
+    }
+
+    // [1] 특정 기기 하나만 로그아웃
+    public void forceDisconnectOne(String userId, Long targetSessionId) {
+        Set<WebSocketSession> sessions = userSessionsMap.get(userId);
+        if (sessions == null) return;
+
+        for (WebSocketSession session : sessions) {
+            Long sId = (Long) session.getAttributes().get("sessionId");
+            // 세션 ID가 일치하는 놈만 연결 끊기
+            if (sId != null && sId.equals(targetSessionId)) {
+                try {
+                    log.warn("특정 기기 강제 추방: User={}, Session={}", userId, targetSessionId);
+                    session.close(new CloseStatus(4001, "Force Logout by Admin"));
+                } catch (Exception e) {
+                    log.error("소켓 강제 종료 중 에러", e);
+                }
+            }
+        }
+    }
+
+    // [2] 나 빼고 나머지 다 로그아웃
+    public void forceDisconnectOthers(String userId, Long mySessionId) {
+        Set<WebSocketSession> sessions = userSessionsMap.get(userId);
+        if (sessions == null) return;
+
+        for (WebSocketSession session : sessions) {
+            Long sId = (Long) session.getAttributes().get("sessionId");
+            // 내 세션 ID가 아니면 다 끊어!
+            if (sId != null && !sId.equals(mySessionId)) {
+                try {
+                    log.warn("다른 기기 강제 추방: User={}, Session={}", userId, sId);
+                    session.close(new CloseStatus(4001, "Force Logout Others"));
+                } catch (Exception e) {
+                    log.error("소켓 강제 종료 중 에러", e);
+                }
+            }
+        }
+    }
+    
+    // [3] 전부 다 로그아웃
+    public void forceDisconnectAll(String userId) {
+        Set<WebSocketSession> sessions = userSessionsMap.get(userId);
+        if (sessions != null) {
+            for (WebSocketSession session : sessions) {
+                try {
+                    session.close(new CloseStatus(4001, "Force Logout All"));
+                } catch (Exception e) {
+                    log.error("소켓 강제 종료 중 에러", e);
                 }
             }
         }

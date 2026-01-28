@@ -56,7 +56,7 @@ export const useConnection = () => {
         if (event.code === 1006) {
           // 서버가 쫓아낸 건지 확인하기 위해 API 한번 찔러봄
           // 실패 시 axiosConfig.ts가 작동하여 로그인 페이지로 튕겨냄
-          axios.post('/api/user/refresh').catch(() => {
+          axios.post('/api/sessions/refresh').catch(() => {
             // 에러 처리는 axiosConfig가 전역적으로 수행함 (로그아웃 처리)
           });
         }

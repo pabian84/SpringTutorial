@@ -16,20 +16,11 @@ import {
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { showToast, showConfirm } from '../utils/Alert';
-
-// 데이터 타입
-interface DeviceSession {
-  id: number;
-  deviceType: string;
-  userAgent: string;
-  ipAddress: string;
-  location: string;
-  lastActive: string;
-}
+import type { DeviceSessionDTO } from '../types/dtos';
 
 export default function DeviceManagement() {
   const navigate = useNavigate();
-  const [sessions, setSessions] = useState<DeviceSession[]>([]);
+  const [sessions, setSessions] = useState<DeviceSessionDTO[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // 데이터 로드
@@ -50,16 +41,17 @@ export default function DeviceManagement() {
     fetchSessions();
   }, []);
 
-  // [기능] 개별 로그아웃
-  const handleLogoutOne = async (id: number, isCurrent: boolean) => {
+  // [기능] 특정 기기 로그아웃
+  const handleLogoutOne = async (sessionId: number, isCurrent: boolean) => {
     const result = await showConfirm('로그아웃', '해당 기기의 접속을 해제하시겠습니까?');
     if (!result.isConfirmed) return;
 
     try {
-      await axios.delete(`/api/sessions/${id}`);
+      await axios.post('/api/sessions/revoke', { targetSessionId: sessionId });
       if (isCurrent) {
         localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('myId');
+
 
         // 약간의 딜레이 후 이동 (토스트 메시지 볼 시간 확보)
         setTimeout(() => {
@@ -67,7 +59,7 @@ export default function DeviceManagement() {
         }, 500);
         
       } else {
-        setSessions((prev) => prev.filter((s) => s.id !== id));
+        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
       }
       showToast('접속이 해제되었습니다.', 'success');
     } catch (e) {
@@ -82,10 +74,8 @@ export default function DeviceManagement() {
     if (!result.isConfirmed) return;
 
     try {
-      const refreshToken = localStorage.getItem('refreshToken') || '';
-      await axios.delete('/api/sessions/others', {
-        headers: { 'Refresh-Token': refreshToken }
-      });
+      await axios.delete('/api/sessions/others');
+
       await fetchSessions();
       showToast('다른 기기의 접속이 모두 해제되었습니다.', 'success');
     } catch (e) {
@@ -413,8 +403,8 @@ export default function DeviceManagement() {
             <p>기기 정보를 불러오는 중...</p>
           </div>
         ) : sessions.length > 0 ? (
-          sessions.map((session, idx) => {
-            const isCurrent = idx === 0; 
+          sessions.map((session) => {
+            const isCurrent = session.isCurrent;
             
             const cardStyle = isCurrent 
               ? { ...styles.card, border: '1px solid rgba(16, 185, 129, 0.4)', boxShadow: '0 0 15px rgba(16, 185, 129, 0.1)' }

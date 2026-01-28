@@ -31,7 +31,7 @@ export const useDashboardData = () => {
   const { data: onlineUsers = [] } = useQuery({
     queryKey: ['onlineUsers'], 
     queryFn: async () => {
-      const res = await axios.get('/api/user/onlineList');
+      const res = await axios.get('/api/sessions/onlineList');
       return res.data as UserDTO[];
     },
   });
@@ -121,9 +121,16 @@ export const useDashboardData = () => {
 
   // 7. WebSocket 연결 (Dashboard & Chat)
   useEffect(() => {
+     // 1. 토큰 확인 (토큰이 없으면 연결 시도조차 하지 않음)
+    const token = localStorage.getItem('accessToken');
+    
+    // 로그아웃 상태면 연결 끊기
+    if (!token) {
+      return;
+    }
     // Dashboard WS
     if (!dashboardWs.current || dashboardWs.current.readyState === WebSocket.CLOSED) {
-      dashboardWs.current = new WebSocket(`${WS_URL}/ws/dashboard`);
+      dashboardWs.current = new WebSocket(`${WS_URL}/ws/dashboard?token=${token}`);
       dashboardWs.current.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
@@ -145,7 +152,7 @@ export const useDashboardData = () => {
 
     // Chat WS
     if (!chatWs.current || chatWs.current.readyState === WebSocket.CLOSED) {
-      chatWs.current = new WebSocket(`${WS_URL}/ws/chat`);
+      chatWs.current = new WebSocket(`${WS_URL}/ws/chat?token=${token}`);
       chatWs.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -185,7 +192,7 @@ export const useDashboardData = () => {
   // 로그아웃
   const handleLogout = async () => {
     try {
-      if (myId) await axios.post('api/user/logout', { userId: myId });
+      await axios.post('api/user/logout');
     } catch (e) {
       console.error('Logout failed', e);
       showToast('Logout failed', 'error');

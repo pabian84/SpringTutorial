@@ -17,7 +17,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import com.example.demo.domain.user.mapper.UserSessionMapper;
+import com.example.demo.domain.user.mapper.SessionMapper;
 import com.example.demo.global.security.JwtAuthenticationFilter;
 import com.example.demo.global.security.JwtTokenProvider;
 
@@ -29,7 +29,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserSessionMapper sessionMapper; // [추가] 필터에 넣어줘야 함
+    private final SessionMapper sessionMapper; // [추가] 필터에 넣어줘야 함
 
     // 1. 비밀번호 암호화 기계 등록 (이게 있어야 로그인 가능)
     @Bean
@@ -52,7 +52,7 @@ public class SecurityConfig {
             .sessionManagement(session -> 
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 끄기 (JWT 필수)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/user/login", "/api/user/refresh", "/ws/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll() // 로그인, 소켓, 문서는 통과
+                .requestMatchers("/api/user/login", "/api/sessions/refresh", "/ws/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll() // 로그인, 소켓, 문서는 통과
                 .anyRequest().authenticated() // 나머지는 출입증(JWT) 검사
             )
             // JWT 검사 필터를 먼저 실행

@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserSession {
+public class Session {
     private Long id;
     private String userId;
 

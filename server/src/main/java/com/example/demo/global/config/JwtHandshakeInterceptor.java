@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
-import com.example.demo.domain.user.mapper.UserSessionMapper;
+import com.example.demo.domain.user.mapper.SessionMapper;
 import com.example.demo.global.security.JwtTokenProvider;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserSessionMapper sessionMapper;
+    private final SessionMapper sessionMapper;
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler,
@@ -42,15 +42,16 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
                 // 3. [핵심] DB 생존 확인 (세션 바인딩)
                 Long sessionId = jwtTokenProvider.getSessionId(token);
                 
-                if (sessionId == null || sessionMapper.findById(sessionId) == null) {
+                if (sessionId == null || sessionMapper.findBySessionId(sessionId) == null) {
                     log.warn("웹소켓 연결 차단: 유효하지 않은 세션 (Logout됨) - SessionID: {}", sessionId);
                     response.setStatusCode(HttpStatus.UNAUTHORIZED);
                     return false; // 접속 거부!
                 }
                 
-                // 4. 통과되면 사용자 ID를 속성에 저장 (Handler에서 사용)
+                // 4. 통과되면 사용자 ID와 세션ID를 속성에 저장 (Handler에서 사용)
                 String userId = jwtTokenProvider.getAuthentication(token).getName();
                 attributes.put("userId", userId);
+                attributes.put("sessionId", sessionId);
                 return true;
             }
         }

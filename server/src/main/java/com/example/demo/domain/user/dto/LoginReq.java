@@ -6,7 +6,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserLoginReq {
+public class LoginReq {
     private String id;
     private String password;
     private boolean isRememberMe; // 로그인 유지 여부

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { showAlert, showToast } from '../utils/Alert';
+import type { LoginResultDTO } from '../types/dtos';
 
 export default function Login() {
   const [id, setId] = useState('admin');
@@ -13,28 +14,39 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); // form submit 시 페이지 새로고침 방지
     try {
-      const res = await axios.post('/api/user/login', {
+      const res = await axios.post<LoginResultDTO>('/api/user/login', {
         id, password, isRememberMe: keepLogin
       });
       
-      const { status, message, user, accessToken } = res.data;
+      const { user, accessToken } = res.data;
 
-      if (status === 'ok') {
-        // [수정] AccessToken은 무조건 localStorage에 저장 (sessionStorage 안 씀)
+      // 토큰과 유저 정보가 있으면 성공 처리
+      if (accessToken && user) {
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('myId', user.id);
         
-        // 성공 시 가볍게 토스트 알림을 띄우고 이동
-        showToast(`환영합니다, ${res.data.user.name}님!`, 'success');
+        showToast(`환영합니다, ${user.name}님!`, 'success');
         navigate('/dashboard');
       } else {
-        // [변경] 실패 시 모달 창 띄우기
-        showAlert('로그인 실패', message, 'error');
+        // 혹시라도 데이터가 비어있다면 에러 처리
+        throw new Error("로그인 응답 데이터 오류");
       }
     } catch (e) {
       console.error(e);
-      // [변경] 서버 에러
-      showAlert('오류 발생', '로그인 중 문제가 발생했습니다.', 'error');
+      let errorMessage = '로그인 중 오류가 발생했습니다.';
+
+      if (axios.isAxiosError(e)) {
+        // 서버가 보낸 에러 메시지가 있다면 사용 (e.response.data가 string이라고 가정)
+        if (e.response?.data && typeof e.response.data === 'string') {
+          errorMessage = e.response.data;
+        } else if (e.response?.status === 401) {
+          errorMessage = '아이디 또는 비밀번호를 확인해주세요.';
+        }
+      } else if (e instanceof Error) {
+        errorMessage = e.message;
+      }
+
+      showAlert('로그인 실패', errorMessage, 'error');
     }
   };
 
