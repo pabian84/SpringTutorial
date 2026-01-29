@@ -17,6 +17,8 @@ import com.example.demo.domain.user.entity.Session;
 import com.example.demo.domain.user.entity.User;
 import com.example.demo.domain.user.mapper.SessionMapper;
 import com.example.demo.domain.user.mapper.UserMapper;
+import com.example.demo.global.exception.CustomException;
+import com.example.demo.global.exception.ErrorCode;
 import com.example.demo.global.security.JwtTokenProvider;
 
 import lombok.RequiredArgsConstructor;
@@ -36,8 +38,11 @@ public class UserService {
     public LoginResult login(LoginReq loginReq, String userAgent, String ipAddress) {
         // 1. 유저 검증
         User user = userMapper.findById(loginReq.getId());
-        if (user == null || !passwordEncoder.matches(loginReq.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 일치하지 않습니다."); // Controller가 잡아서 401로 처리
+        if (user == null) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND); // Controller가 잡아서 401로 처리
+        }
+        if (!passwordEncoder.matches(loginReq.getPassword(), user.getPassword())) {
+            throw new CustomException(ErrorCode.INVALID_PASSWORD); // 비밀번호 틀림
         }
 
         // 2. 토큰 생성
@@ -68,7 +73,7 @@ public class UserService {
         // [확인용 로그]
         if (session.getId() == null) {
             log.error("CRITICAL: Session ID was NOT generated!");
-            throw new RuntimeException("Session ID generation failed");
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
         
         // 생성된 session.getId()를 가지고 Access Token 생성 (세션 바인딩)

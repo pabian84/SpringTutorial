@@ -61,7 +61,7 @@ public class UserController {
             ResponseCookie cookie = ResponseCookie.from("refreshToken", result.getRefreshToken())
                         .httpOnly(true)
                         .path("/")
-                        .secure(false) //https false
+                        .secure(false) // HTTPS 환경이면 true 권장
                         .maxAge(maxAge) // 7일
                         .build();
             response.addHeader("Set-Cookie", cookie.toString());

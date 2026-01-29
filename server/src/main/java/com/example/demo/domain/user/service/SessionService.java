@@ -15,6 +15,8 @@ import com.example.demo.domain.user.entity.AccessLog;
 import com.example.demo.domain.user.entity.Session;
 import com.example.demo.domain.user.mapper.UserMapper;
 import com.example.demo.domain.user.mapper.SessionMapper;
+import com.example.demo.global.exception.CustomException;
+import com.example.demo.global.exception.ErrorCode;
 import com.example.demo.global.security.JwtTokenProvider;
 
 import lombok.RequiredArgsConstructor;
@@ -38,14 +40,14 @@ public class SessionService {
 
         // 1. 토큰 유효성 검사 (서명 위조 등)
         if (!jwtTokenProvider.validateToken(refreshToken)) {
-            throw new RuntimeException("Invalid Refresh Token");
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
         }
 
         // 2. DB(user_sessions)에 해당 토큰이 살아있는지 확인!
         // 화면에서 '로그아웃' 버튼을 눌러 DB에서 삭제했다면, 여기서 null이 나와서 튕겨내야 합니다.
         Session session = sessionMapper.findByRefreshToken(refreshToken);
         if (session == null) {
-            throw new RuntimeException("Session Expired or Logged Out"); // 여기서 401/403 발생 -> 프론트가 튕겨냄
+            throw new CustomException(ErrorCode.EXPIRED_TOKEN); // 여기서 401/403 발생 -> 프론트가 튕겨냄
         }
 
         // "토큰으로는 찾았는데, ID로는 못 찾는" 황당한 경우를 방지합니다.
@@ -53,7 +55,7 @@ public class SessionService {
         if (sessionMapper.findBySessionId(session.getId()) == null) {
             log.error("치명적 오류: 세션 불일치 감지 (토큰 O, ID X) - 강제 만료 처리. ID: {}", session.getId());
             // 여기서 예외를 던지면 axiosConfig가 401로 인식하고 로그인 페이지로 보냅니다.
-            throw new RuntimeException("Session Integrity Error: ID not found"); 
+            throw new CustomException(ErrorCode.SESSION_NOT_FOUND);
         }
 
         // 4. 새 액세스 토큰 발급
@@ -99,11 +101,12 @@ public class SessionService {
         Session targetSession = sessionMapper.findBySessionId(targetSessionId);
         // 권한 검사 (비즈니스 로직)
         if (targetSession == null) {
-            throw new IllegalArgumentException("존재하지 않는 세션입니다.");
+            throw new CustomException(ErrorCode.SESSION_NOT_FOUND);
         }
         String currentUserId = sessionMapper.findBySessionId(currentSessionId).getUserId();
+        // 내 기기가 아닌 것을 삭제하려 함 (Forbidden)
         if (!targetSession.getUserId().equals(currentUserId)) {
-            throw new SecurityException("본인의 기기만 로그아웃 시킬 수 있습니다."); // 403 유발
+            throw new CustomException(ErrorCode.NOT_MY_DEVICE);
         }
 
         //DB 삭제

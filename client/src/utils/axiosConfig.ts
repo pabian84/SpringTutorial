@@ -1,5 +1,6 @@
 import axios, { AxiosHeaders } from 'axios';
 import { showToast } from './Alert';
+import type { ErrorCode } from '../types/dtos';
 
 // 토큰 갱신 중인지 확인하는 플래그
 let isRefreshing = false;
@@ -53,8 +54,11 @@ export const setupAxiosInterceptors = () => {
         return Promise.reject(error);
       }
 
-      // 리프레시 요청 자체가 401(인증 실패)이면 답이 없음 -> 즉시 강제 로그아웃
-      if (originalRequest.url?.includes('/refresh') && (error.response.status === 401 || error.response.status === 403)) {
+      const { status, data } = error.response;
+      const errorCode = data?.code as ErrorCode; // 서버가 보낸 커스텀 코드 (예: "A003")
+
+      // 리프레시 요청 자체가 401(인증 실패) -> 즉시 강제 로그아웃
+      if (originalRequest.url?.includes('/refresh') && status === 401) {
         console.warn("[Axios] 리프레시 토큰 만료됨 -> 강제 로그아웃");
         localStorage.removeItem('accessToken');
         localStorage.removeItem('myId');
@@ -63,7 +67,7 @@ export const setupAxiosInterceptors = () => {
       }
 
       // 로그아웃 요청이 실패(401)했다? -> 이미 로그아웃 된 것임 -> 강제 이동시킴.
-      if (originalRequest.url?.includes('/logout') && (error.response.status === 401 || error.response.status === 403)) {
+      if (originalRequest.url?.includes('/logout') && status === 401) {
         console.warn("[Axios] 로그아웃 요청 401 -> 강제 클리어 및 이동");
          
         localStorage.removeItem('accessToken');
@@ -73,12 +77,34 @@ export const setupAxiosInterceptors = () => {
         return Promise.reject(error);
       }
 
-      // 2. 401 에러(인증 실패)가 떴는데, 아직 재시도를 안 한 요청이라면
-      if (error.response && (error.response.status === 401 || error.response.status === 403) && !originalRequest._retry) {
-        // 토큰이 없는데 403이 뜨면 바로 로그인 페이지로
-        if (error.response.status === 403 && !localStorage.getItem('accessToken')) {
-          window.location.href = '/';
-          return Promise.reject(error);
+      // 권한 없음 / 강제 로그아웃 (403)
+      if (status === 403) {
+        // "내 기기 아님(A006)"은 로그아웃 시키면 안 됨 (그냥 에러 메시지만 띄움)
+        if (errorCode === 'A006') {
+            showToast("본인의 기기만 로그아웃 할 수 있습니다.", "error");
+            return Promise.reject(error);
+        }
+
+        // 그 외 403(접근 거부, 강퇴 등)은 로그아웃 처리
+        console.warn(`[Axios] 접근 거부(${errorCode}) -> 로그아웃`);
+        handleForceLogout();
+      }
+
+      // 세션 없음 (404)
+      if (status === 404 && errorCode === 'S001') {
+        // 세션을 못 찾음 -> 이미 삭제된 경우 -> 로그아웃
+        handleForceLogout();
+      }
+
+      // 액세스 토큰 만료 (401) -> 리프레시 시도
+      // 백엔드 필터에서 401을 줄 때 보통 코드가 없지만(null), 
+      // 만약 EntryPoint를 구현해서 "A003"을 준다면 명확히 구분 가능.
+      // 현재는 코드가 없거나, "A002"(Invalid), "A003"(Expired)일 때 시도.
+      if (status === 401 && !originalRequest._retry) {
+
+        // 만약 "비밀번호 불일치(A001)" 같은 401이라면 리프레시 할 필요 없음 (로그인 창에서 난 에러니까)
+        if (errorCode === 'A001') {
+            return Promise.reject(error);
         }
 
         // 이미 누군가 갱신을 하고 있다면? -> 줄 서서 기다림
@@ -147,4 +173,14 @@ export const setupAxiosInterceptors = () => {
       return Promise.reject(error);
     }
   );
+};
+
+// 강제 로그아웃 처리 헬퍼
+const handleForceLogout = () => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('myId');
+    // 무한 루프 방지: 이미 로그인 페이지면 리로드 안 함
+    if (window.location.pathname !== '/') {
+        window.location.href = '/';
+    }
 };

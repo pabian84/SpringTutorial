@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.domain.user.mapper.SessionMapper;
 import com.example.demo.domain.user.service.SessionService;
 import com.example.demo.global.security.JwtTokenProvider;
 import com.example.demo.handler.UserConnectionHandler;
@@ -31,12 +30,11 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class SessionController {
 
-    private final SessionMapper sessionMapper;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserConnectionHandler userConnectionHandler;
     private final SessionService sessionService;
 
-    @Operation(summary = "토큰 갱신 (Refresh)")
+    @Operation(summary = "쿠키에 있는 refreshToken을 사용하여 accessToken 갱신")
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@CookieValue(value = "refreshToken", required = false) String refreshToken) {
         try {
@@ -100,7 +98,7 @@ public class SessionController {
         }
 
         // DB 삭제 실행
-        sessionMapper.terminateOthers(userId, currentSessionId);
+        sessionService.deleteOtherSessions(userId, currentSessionId);
         // 소켓 끊기
         userConnectionHandler.forceDisconnectOthers(userId, currentSessionId);
         
@@ -109,9 +107,23 @@ public class SessionController {
 
     // 4. 전체 로그아웃
     @DeleteMapping("/all")
-    public ResponseEntity<?> revokeAllSessions(@AuthenticationPrincipal UserDetails userDetails, HttpServletResponse response) {
+    public ResponseEntity<?> revokeAllSessions(@AuthenticationPrincipal UserDetails userDetails, HttpServletRequest request, HttpServletResponse response) {
         String userId = userDetails.getUsername();
-        sessionMapper.deleteByUserId(userId);
+
+        // 토큰 조회
+        String token = jwtTokenProvider.resolveToken(request);
+        if (token == null) {
+             return ResponseEntity.status(401).body("인증 토큰이 없습니다.");
+        }
+        
+        // 헤더 대신 토큰에서 내 세션 ID 추출
+        Long currentSessionId = jwtTokenProvider.getSessionId(token);
+        if (currentSessionId == null) {
+             return ResponseEntity.badRequest().body("현재 세션 정보를 확인할 수 없습니다.");
+        }
+        // DB 삭제
+        sessionService.deleteAllSessions(userId, currentSessionId);
+        // 소켓 끊기
         userConnectionHandler.forceDisconnectAll(userId);
         
         ResponseCookie cookie = ResponseCookie.from("refreshToken", "").maxAge(0).path("/").build();

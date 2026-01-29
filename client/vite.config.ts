@@ -10,7 +10,12 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080', // /api 요청은 8080으로 토스
         changeOrigin: true,
-      }
+      },
+      '/ws': {
+        target: 'ws://localhost:8080', // 웹소켓 주소
+        ws: true,
+        changeOrigin: true,
+      },
     }
   }
 })

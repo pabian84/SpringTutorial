@@ -120,3 +120,13 @@ export interface SystemStatusDTO {
   memory: number;
   memoryPercent: number;
 }
+
+export type ErrorCode = 
+  | 'A001' // 비밀번호 불일치
+  | 'A002' // 유효하지 않은 토큰
+  | 'A003' // 만료된 토큰
+  | 'A004' // 세션 만료/로그아웃
+  | 'A005' // 권한 없음
+  | 'A006' // 내 기기 아님
+  | 'S001' // 세션 찾을 수 없음
+  | 'C001'; // 잘못된 입력
