@@ -97,8 +97,10 @@ public class UserController {
 
         // 3. DB 삭제 + 소켓 끊기 (둘 다 sessionId 이용)
         if (userId != null && sessionId != null) {
+            String userAgent = request.getHeader("User-Agent");
+            String ipAddress = request.getRemoteAddr();
             // 서비스에는 세션 ID를 넘겨서 DB 삭제
-            userService.logout(userId, sessionId); 
+            userService.logout(userId, sessionId, userAgent, ipAddress); 
             // 내 소켓도 즉시 끊어버리기 (좀비 방지)
             userConnectionHandler.forceDisconnectOne(userId, sessionId);
         }

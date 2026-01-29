@@ -83,7 +83,7 @@ public class UserConnectionHandler extends TextWebSocketHandler {
             // 세션 ID가 일치하는 놈만 연결 끊기
             if (sId != null && sId.equals(targetSessionId)) {
                 try {
-                    log.warn("특정 기기 강제 추방: User={}, Session={}", userId, targetSessionId);
+                    log.warn("특정 기기 세션 종료: User={}, Session={}", userId, targetSessionId);
                     session.close(new CloseStatus(4001, "Force Logout by Admin"));
                 } catch (Exception e) {
                     log.error("소켓 강제 종료 중 에러", e);

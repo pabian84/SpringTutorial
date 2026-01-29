@@ -92,7 +92,9 @@ public class UserService {
             
             if (userAgent.contains("Windows")) os = "Windows";
             else if (userAgent.contains("Mac")) os = "Mac";
+            else if (userAgent.contains("iOS")) os = "iOS";
             else if (userAgent.contains("Linux")) os = "Linux";
+            else if (userAgent.contains("Android")) os = "Android";
         }
         AccessLog logData = AccessLog.builder()
                 .userId(user.getId())
@@ -118,17 +120,39 @@ public class UserService {
     // 로그아웃 처리 (특정 기기)
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
-    public void logout(String userId, Long sessionId) {
+    public void logout(String userId, Long sessionId, String userAgent, String ipAddress) {
+        String location = "Unknown";
         // 1. DB에서 바로 삭제
         if (sessionId != null) {
+            Session session = sessionMapper.findBySessionId(sessionId);
+            location = session != null ? session.getLocation() : "Unknown";
             sessionMapper.deleteBySessionId(sessionId); // user_sessions에서 삭제
         }
+        String browser = "Unknown";
+        String os = "Unknown";
+        if (userAgent != null) {
+            if (userAgent.contains("Chrome")) browser = "Chrome";
+            else if (userAgent.contains("Firefox")) browser = "Firefox";
+            else if (userAgent.contains("Safari")) browser = "Safari";
+            
+            if (userAgent.contains("Windows")) os = "Windows";
+            else if (userAgent.contains("Mac")) os = "Mac";
+            else if (userAgent.contains("iOS")) os = "iOS";
+            else if (userAgent.contains("Linux")) os = "Linux";
+            else if (userAgent.contains("Android")) os = "Android";
+        }
+        log.info("browser: " + browser + ", os: " + os);
         // 2. 로그 기록
         AccessLog logData = AccessLog.builder()
                 .userId(userId)
-                .type("LOGOUT")
                 .sessionId(sessionId)
+                .ipAddress(ipAddress)
+                .location(location)
+                .userAgent(userAgent)
+                .browser(browser)
+                .os(os)
                 .endpoint("/api/user/logout") // 엔드포인트 명시
+                .type("LOGOUT")
                 .build();
         userMapper.saveLog(logData);
     }
