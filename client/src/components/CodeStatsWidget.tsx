@@ -1,6 +1,6 @@
-import axios from 'axios';
 import { memo, useEffect, useState } from 'react';
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { statsApi } from '../api/widgetApi';
 import type { CodeData } from '../types/dtos';
 
 // 언어별 브랜드 컬러 (Java:빨강, TS:파랑, CSS:하늘색, 기타:회색)
@@ -29,10 +29,10 @@ export function StrandaloneCodeStatsWidget() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get<Record<string, number>>('/api/stats/code')
-      .then(res => {
+    statsApi.getCodeStats()
+      .then(data => {
         // Map 데이터를 배열로 변환
-        const chartData = Object.entries(res.data).map(([name, value]) => ({
+        const chartData = Object.entries(data).map(([name, value]) => ({
           name,
           value
         }));

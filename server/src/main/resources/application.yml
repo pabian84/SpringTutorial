@@ -47,6 +47,13 @@ jwt:
   # 리프레시 토큰 만료 (7일) - 이게 '로그인 유지'의 핵심입니다.
   refresh-token-validity-in-seconds: 604800
 
+# CORS 설정 (프론트엔드 주소 관리)
+app:
+  cors:
+    hosts: localhost, 10.10.10.183
+    ports: 5173, 5174
+    
+
 # 로그 설정
 # logging:
 #   level:

@@ -1,5 +1,5 @@
-import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
+import { memoApi } from '../api/widgetApi';
 import type { MemoDTO } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 
@@ -26,8 +26,8 @@ export function StandaloneMemoWidget() {
   const fetchMemos = useCallback(async () => {
     if (!myId) return;
     try {
-      const res = await axios.get<MemoDTO[]>(`/api/memo/${myId}`);
-      setMemos(res.data);
+      const data = await memoApi.getMemos(myId);
+      setMemos(data);
     } catch (e) {
       console.error("메모 로딩 실패", e);
     }
@@ -40,8 +40,8 @@ export function StandaloneMemoWidget() {
 
     const initLoad = async () => {
         try {
-          const res = await axios.get<MemoDTO[]>(`/api/memo/${myId}`);
-          setMemos(res.data);
+          const data = await memoApi.getMemos(myId);
+          setMemos(data);
         } catch (e) {
           console.error("메모 초기 로딩 실패", e);
         }
@@ -53,7 +53,7 @@ export function StandaloneMemoWidget() {
   // 메모 추가
   const handleAdd = async (content: string) => {
     try {
-      await axios.post('/api/memo', { userId: myId, content });
+      await memoApi.addMemo(myId!, content);
       fetchMemos(); // 재로딩
     } catch (e) {
       console.error("메모 추가 실패", e);
@@ -67,7 +67,7 @@ export function StandaloneMemoWidget() {
     // yes 클릭 시 삭제 진행
     if (result.isConfirmed) {
       try {
-        await axios.delete(`/api/memo/${id}`);
+        await memoApi.deleteMemo(id);
         // 삭제 성공 후 토스트 알림
         showToast('메모가 삭제되었습니다.', 'success');
         fetchMemos(); // 재로딩

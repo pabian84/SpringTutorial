@@ -23,7 +23,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        // ws://localhost:8080/ws/dashboard 로 접속하면 통신 시작
+        // 시스템 정보 방송용 주소 개설
         registry.addHandler(dashboardHandler, "/ws/dashboard")
                 .setAllowedOrigins("*") // 모든 곳에서 접속 허용 (CORS 무시)
                 .addInterceptors(jwtHandshakeInterceptor);

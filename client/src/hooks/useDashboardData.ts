@@ -1,11 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { ChatHistoryDTO, CodeData, MemoDTO, StockDTO, SystemStatusDTO, UserDTO } from '../types/dtos';
+import { sessionApi } from '../api/sessionApi';
+import { userApi } from '../api/userApi';
+import { chatApi, financeApi, memoApi, statsApi } from '../api/widgetApi';
+import type { ChatHistoryDTO, CodeData, SystemStatusDTO } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 
-const WS_URL = import.meta.env.VITE_WS_URL;
+// 하드코딩된 주소 대신, 현재 브라우저 주소를 기반으로 설정
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = `${protocol}//${window.location.host}`; // host는 도메인+포트 포함
 
 export const useDashboardData = () => {
   const navigate = useNavigate();
@@ -30,19 +34,14 @@ export const useDashboardData = () => {
   // 2. 접속자 리스트 (React Query)
   const { data: onlineUsers = [] } = useQuery({
     queryKey: ['onlineUsers'], 
-    queryFn: async () => {
-      const res = await axios.get('/api/sessions/onlineList');
-      return res.data as UserDTO[];
-    },
+    queryFn: sessionApi.getOnlineUsers,
+    enabled: !!myId,
   });
 
   // 3. 환율 데이터
   const { data: exchangeData = [] } = useQuery({
     queryKey: ['exchangeData'],
-    queryFn: async () => {
-      const res = await axios.get<StockDTO[]>('/api/finance/dashboard');
-      return res.data as StockDTO[];
-    },
+    queryFn: financeApi.getExchangeRates,
     staleTime: 1000 * 60 // 1분 캐시
   });
 
@@ -50,8 +49,8 @@ export const useDashboardData = () => {
   const { data: codeData = [] } = useQuery({
     queryKey: ['codeStats'],
     queryFn: async () => {
-      const res = await axios.get<Record<string, number>>('/api/stats/code');
-      const chartData = Object.entries(res.data).map(([name, value]) => ({
+      const data = await statsApi.getCodeStats();
+      const chartData = Object.entries(data).map(([name, value]) => ({
         name,
         value
       }));
@@ -65,8 +64,10 @@ export const useDashboardData = () => {
   const { data: memos = [], refetch: refetchMemos } = useQuery({
     queryKey: ['memos', myId],
     queryFn: async () => {
-       const res = await axios.get<MemoDTO[]>(`/api/memo/${myId}`);
-       return res.data;
+      if (!myId) {
+        return [];
+      }
+       return await memoApi.getMemos(myId);
     },
     enabled: !!myId, 
     refetchOnWindowFocus: false, 
@@ -76,7 +77,7 @@ export const useDashboardData = () => {
   const handleAddMemo = useCallback(async (content: string) => {
     if (!myId) return;
     try {
-      await axios.post('/api/memo', { userId: myId, content });
+      await memoApi.addMemo(myId, content);
       refetchMemos();
     } catch (e) {
       console.error("메모 추가 실패", e);
@@ -89,7 +90,7 @@ export const useDashboardData = () => {
     const result = await showConfirm('메모 삭제', '이 메모를 삭제하시겠습니까?');
     if (result.isConfirmed) {
       try {
-        await axios.delete(`/api/memo/${id}`);
+        await memoApi.deleteMemo(id);
         showToast('메모가 삭제되었습니다.', 'success');
         refetchMemos();
       } catch (e) {
@@ -104,13 +105,13 @@ export const useDashboardData = () => {
     queryKey: ['chatHistory'],
     queryFn: async () => {
       try {
-        const res = await axios.get('/api/chat/history');
-        if (Array.isArray(res.data)) {
-          setChatMessages(res.data);
+        const data = await chatApi.getHistory();
+        if (Array.isArray(data)) {
+          setChatMessages(data);
         } else {
           setChatMessages([]);
         }
-        return res.data as ChatHistoryDTO[];
+        return data;
       } catch (e) {
         console.error('채팅 기록을 가져 올 수 없습니다', e);
         return [];
@@ -192,7 +193,7 @@ export const useDashboardData = () => {
   // 로그아웃
   const handleLogout = async () => {
     try {
-      await axios.post('api/user/logout');
+      await userApi.logout();
     } catch (e) {
       console.error('Logout failed', e);
       showToast('Logout failed', 'error');

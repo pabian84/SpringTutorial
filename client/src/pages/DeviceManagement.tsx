@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react';
-import { 
-  FaDesktop, 
-  FaMobileAlt, 
-  FaTabletAlt, 
-  FaTrashAlt, 
-  FaShieldAlt, 
-  FaSignOutAlt, 
-  FaCheckCircle,
+import {
   FaArrowLeft,
-  FaMapMarkerAlt,
+  FaCheckCircle,
   FaClock,
+  FaDesktop,
   FaExclamationTriangle,
+  FaMapMarkerAlt,
+  FaMobileAlt,
+  FaShieldAlt,
+  FaSignOutAlt,
+  FaTabletAlt,
+  FaTrashAlt,
   FaUserShield
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { showToast, showConfirm } from '../utils/Alert';
+import { sessionApi } from '../api/sessionApi';
 import type { DeviceSessionDTO } from '../types/dtos';
+import { showConfirm, showToast } from '../utils/Alert';
 
 export default function DeviceManagement() {
   const navigate = useNavigate();
@@ -27,8 +27,8 @@ export default function DeviceManagement() {
   const fetchSessions = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('/api/sessions');
-      setSessions(res.data);
+      const data = await sessionApi.getMySessions();
+      setSessions(data);
     } catch (e) {
       console.error(e);
       showToast('기기 목록을 불러오지 못했습니다.', 'error');
@@ -47,7 +47,7 @@ export default function DeviceManagement() {
     if (!result.isConfirmed) return;
 
     try {
-      await axios.post('/api/sessions/revoke', { targetSessionId: sessionId });
+      await sessionApi.revokeSession(sessionId);
       if (isCurrent) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('myId');
@@ -74,8 +74,7 @@ export default function DeviceManagement() {
     if (!result.isConfirmed) return;
 
     try {
-      await axios.delete('/api/sessions/others');
-
+      await sessionApi.revokeOthers();
       await fetchSessions();
       showToast('다른 기기의 접속이 모두 해제되었습니다.', 'success');
     } catch (e) {
@@ -90,7 +89,7 @@ export default function DeviceManagement() {
     if (!result.isConfirmed) return;
 
     try {
-      await axios.delete('/api/sessions/all');
+      await sessionApi.revokeAll();
       localStorage.clear();
       showToast('전체 로그아웃 되었습니다.', 'success');
       navigate('/'); 

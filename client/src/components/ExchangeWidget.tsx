@@ -1,6 +1,6 @@
-import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { financeApi } from '../api/widgetApi';
 import type { StockDTO } from '../types/dtos';
 
 // 차트 색상 (미국: 파랑, 일본: 빨강, 유럽: 노랑/주황)
@@ -20,9 +20,9 @@ export function StandaloneExchangeWidget() {
 
   useEffect(() => {
     // 스프링 서버 API 호출
-    axios.get<StockDTO[]>('/api/finance/dashboard')
-      .then(res => {
-        setData(res.data);
+    financeApi.getExchangeRates()
+      .then(data => {
+        setData(data);
         setLoading(false);
       })
       .catch(err => {

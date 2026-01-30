@@ -39,6 +39,16 @@
       "name": "spring.h2.console.settings.web-allow-others",
       "type": "java.lang.Boolean",
       "description": "Whether to enable remote access."
+    },
+    {
+      "name": "app.cors.hosts",
+      "type": "java.util.List<java.lang.String>",
+      "description": "CORS 허용 호스트 목록 (예: localhost, 10.10.10.183)"
+    },
+    {
+      "name": "app.cors.ports",
+      "type": "java.util.List<java.lang.Integer>",
+      "description": "CORS 허용 포트 목록 (예: 5173, 5174)"
     }
   ],
   "hints": [],

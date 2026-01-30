@@ -11,10 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.domain.user.dto.UserRes;
-import com.example.demo.domain.user.entity.AccessLog;
 import com.example.demo.domain.user.entity.Session;
-import com.example.demo.domain.user.mapper.UserMapper;
 import com.example.demo.domain.user.mapper.SessionMapper;
+import com.example.demo.domain.user.mapper.UserMapper;
+import com.example.demo.global.constant.SecurityConstants;
 import com.example.demo.global.exception.CustomException;
 import com.example.demo.global.exception.ErrorCode;
 import com.example.demo.global.security.JwtTokenProvider;
@@ -30,6 +30,7 @@ public class SessionService {
     private final SessionMapper sessionMapper;
     private final UserMapper userMapper; // Online List 조회용
     private final JwtTokenProvider jwtTokenProvider;
+    private final AccessLogService accessLogService;
 
     /**
      * 토큰 갱신 (Refresh)
@@ -108,16 +109,10 @@ public class SessionService {
         if (!targetSession.getUserId().equals(currentUserId)) {
             throw new CustomException(ErrorCode.NOT_MY_DEVICE);
         }
-
         //DB 삭제
         sessionMapper.deleteBySessionId(targetSessionId);
         // 로그 기록 (약식)
-        AccessLog logData = AccessLog.builder()
-                .userId(currentUserId)
-                .type("LOGOUT")
-                .sessionId(currentSessionId)
-                .build();
-        userMapper.saveLog(logData);
+        accessLogService.saveLog(currentUserId, currentSessionId, SecurityConstants.TYPE_KICK, null, null, null, null);
     }
 
     /**
@@ -128,12 +123,7 @@ public class SessionService {
     public void deleteOtherSessions(String userId, Long currentSessionId) {
         sessionMapper.terminateOthers(userId, currentSessionId);
         // 로그 기록 (약식)
-        AccessLog logData = AccessLog.builder()
-                .userId(userId)
-                .type("LOGOUT")
-                .sessionId(currentSessionId)
-                .build();
-        userMapper.saveLog(logData);
+        accessLogService.saveLog(userId, currentSessionId, SecurityConstants.TYPE_KICK, null, null, null, "ALL_OTHERS");
     }
 
     /**
@@ -144,13 +134,9 @@ public class SessionService {
     public void deleteAllSessions(String userId, Long currentSessionId) {
         sessionMapper.deleteByUserId(userId);
         // 로그 기록 (약식)
-        AccessLog logData = AccessLog.builder()
-                .userId(userId)
-                .type("LOGOUT")
-                .sessionId(currentSessionId)
-                .build();
-        userMapper.saveLog(logData);
+        accessLogService.saveLog(userId, currentSessionId, SecurityConstants.TYPE_KICK, null, null, null, "ALL_DEVICES");
     }
+
 
     /**
      * 현재 접속 중인 사용자 목록 (Online List)

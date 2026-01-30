@@ -18,6 +18,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.example.demo.domain.user.mapper.SessionMapper;
+import com.example.demo.global.constant.SecurityConstants;
 import com.example.demo.global.security.JwtAuthenticationFilter;
 import com.example.demo.global.security.JwtTokenProvider;
 
@@ -30,8 +31,10 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final SessionMapper sessionMapper; // [추가] 필터에 넣어줘야 함
+    // CorsProperties 설정 클래스 주입
+    private final CorsProperties corsProperties;
 
-    // 1. 비밀번호 암호화 기계 등록 (이게 있어야 로그인 가능)
+    // 비밀번호 암호화 기계 등록 (이게 있어야 로그인 가능)
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -66,14 +69,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // 프론트엔드 주소
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        // 프론트엔드 주소. 하드코딩 제거 -> 설정값 사용. 쉼표(,)로 구분된 여러 도메인 지원
+        // 콤마로 자른 뒤, 앞뒤 공백을 제거(.trim()) 해줌 -> 띄어쓰기 실수해도 OK
+        config.setAllowedOrigins(corsProperties.getAllowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 
         // 클라이언트에서 접근 가능한 헤더 설정 (토큰 갱신 시 필요할 수 있음)
-        config.setExposedHeaders(List.of("Authorization", "Refresh-Token"));
+        config.setExposedHeaders(List.of(SecurityConstants.AUTH_HEADER, SecurityConstants.REFRESH_HEADER));
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

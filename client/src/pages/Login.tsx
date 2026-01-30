@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import axios from 'axios';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { userApi } from '../api/userApi';
 import { showAlert, showToast } from '../utils/Alert';
-import type { LoginResultDTO } from '../types/dtos';
 
 export default function Login() {
   const [id, setId] = useState('admin');
@@ -14,11 +14,9 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); // form submit 시 페이지 새로고침 방지
     try {
-      const res = await axios.post<LoginResultDTO>('/api/user/login', {
-        id, password, isRememberMe: keepLogin
-      });
-      
-      const { user, accessToken } = res.data;
+      // axios 직접 호출 제거
+      const data = await userApi.login(id, password, keepLogin);
+      const { user, accessToken } = data;
 
       // 토큰과 유저 정보가 있으면 성공 처리
       if (accessToken && user) {

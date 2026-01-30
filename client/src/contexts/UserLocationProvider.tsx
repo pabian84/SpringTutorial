@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { UserLocationContext, type LocationState } from './UserLocationContext';
+import { showToast } from '../utils/Alert';
 
 // [유틸] 캐시된 위치 가져오기 (내부 사용)
 const getCachedLocation = () => {
@@ -103,6 +104,7 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
           // 이미 허용된 상태 -> 바로 실행 (경고 안 뜸)
           startWatching();
         } else if (result.state === 'denied') {
+          showToast('위치 권한이 차단되었습니다', 'error');
           console.warn("⚠️ 위치 권한이 차단되어 있습니다.");
           if (!lastCoords.current) {
             setLocation(prev => ({ ...prev, loading: false, error: '위치 권한이 차단되었습니다.' }));
@@ -111,18 +113,20 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
           // 허용되지 않은 상태 -> 실행하지 않음 (경고 방지)
           // 대신 사용자가 브라우저 UI에서 '허용'으로 바꾸는 순간 실행되도록 이벤트를 겁니다.
           console.log("⚠️ 위치 권한 대기 중 (브라우저 주소창에서 허용해주세요)");
-          result.onchange = () => {
-            if (result.state === 'granted') {
-              console.log("✅ 사용자가 위치 권한을 허용했습니다. 추적 시작.");
-              startWatching();
-            } else if (result.state === 'denied') {
-              console.warn("❌ 사용자가 위치 권한을 거부했습니다.");
-              if (!lastCoords.current) {
-                setLocation(prev => ({ ...prev, loading: false, error: '위치 권한이 차단되었습니다.' }));
-              }
-            }
-          };
+          startWatching();
         }
+
+        result.onchange = () => {
+          if (result.state === 'granted') {
+            console.log("✅ 사용자가 위치 권한을 허용했습니다. 추적 시작.");
+            startWatching();
+          } else if (result.state === 'denied') {
+            console.warn("❌ 사용자가 위치 권한을 거부했습니다.");
+            if (!lastCoords.current) {
+              setLocation(prev => ({ ...prev, loading: false, error: '위치 권한이 차단되었습니다.' }));
+            }
+          }
+        };
       });
     } else {
       // 구형 브라우저 등 Permissions API가 없는 경우 그냥 실행

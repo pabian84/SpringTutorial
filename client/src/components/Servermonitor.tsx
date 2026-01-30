@@ -12,7 +12,10 @@ const INITIAL_DATA = Array(MAX_DATA_POINTS).fill({
   memory: 0, 
   memoryPercent: 0 
 });
-const WS_URL = import.meta.env.VITE_WS_URL;
+
+// 하드코딩된 주소 대신, 현재 브라우저 주소를 기반으로 설정
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = `${protocol}//${window.location.host}`; // host는 도메인+포트 포함
 
 interface ChartProps {
   data: SystemStatusDTO[];

@@ -1,7 +1,7 @@
-import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { FaChrome, FaDesktop, FaEdge, FaFirefox, FaMobileAlt, FaQuestionCircle, FaSafari } from 'react-icons/fa';
 import { useNavigate, useParams } from 'react-router-dom';
+import { userApi } from '../api/userApi';
 import type { AccessLogDTO } from '../types/dtos';
 import { showAlert } from '../utils/Alert';
 
@@ -12,14 +12,14 @@ export default function UserDetail() {
 
   useEffect(() => {
     // API 호출
-    axios.get(`/api/user/logs`)
-         .then(res => {
-            setLogs(res.data);
-         })
-         .catch(e => {
-            console.error(e);
-            showAlert('오류 발생', '로그 조회 실패.', 'error');
-         });
+    userApi.logs()
+      .then(data => {
+        setLogs(data);
+      })
+      .catch(e => {
+        console.error(e);
+        showAlert('오류 발생', '로그 조회 실패.', 'error');
+      });
   }, [userId]);
 
   // [수정 1] 날짜 포맷팅 함수 (보기 좋은 형태로 변환)

@@ -131,7 +131,7 @@ interface MapProps {
 export default function KakaoMapWidget({ lat, lon }: MapProps) {
   //throw new Error("테스트용 강제 에러 발생 - 대시보드에서 에러 경계 컴포넌트 작동 확인");
   const [loading, error] = useKakaoLoader({
-    appkey: "6262d94b2fbdda55d1e6cbc1b4c3b4c6", 
+    appkey: import.meta.env.VITE_KAKAO_APP_KEY || "6262d94b2fbdda55d1e6cbc1b4c3b4c6", 
     libraries: ["services", "clusterer"],
   });
 

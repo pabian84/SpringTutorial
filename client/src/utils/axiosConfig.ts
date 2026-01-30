@@ -1,6 +1,7 @@
 import axios, { AxiosHeaders } from 'axios';
-import { showToast } from './Alert';
+import { sessionApi } from '../api/sessionApi';
 import type { ErrorCode } from '../types/dtos';
+import { showToast } from './Alert';
 
 // 토큰 갱신 중인지 확인하는 플래그
 let isRefreshing = false;
@@ -20,8 +21,8 @@ const addRefreshSubscriber = (callback: (token: string) => void) => {
 
 // Axios 전역 설정
 export const setupAxiosInterceptors = () => {
-  // 환경 변수에서 기본 URL을 가져와 설정합니다.
-  axios.defaults.baseURL = import.meta.env.VITE_API_URL;
+  // 현재 주소에서 받아서 작업하도록 빈칸
+  axios.defaults.baseURL = '';
   // 기본 설정: 쿠키를 포함한 요청을 보내도록 설정
   axios.defaults.withCredentials = true;
 
@@ -60,20 +61,14 @@ export const setupAxiosInterceptors = () => {
       // 리프레시 요청 자체가 401(인증 실패) -> 즉시 강제 로그아웃
       if (originalRequest.url?.includes('/refresh') && status === 401) {
         console.warn("[Axios] 리프레시 토큰 만료됨 -> 강제 로그아웃");
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('myId');
-        window.location.href = '/'; // 로그인 페이지로 쫓아냄
+        handleForceLogout();
         return Promise.reject(error);
       }
 
       // 로그아웃 요청이 실패(401)했다? -> 이미 로그아웃 된 것임 -> 강제 이동시킴.
       if (originalRequest.url?.includes('/logout') && status === 401) {
         console.warn("[Axios] 로그아웃 요청 401 -> 강제 클리어 및 이동");
-         
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('myId');
-         
-        window.location.href = '/'; 
+        handleForceLogout();
         return Promise.reject(error);
       }
 
@@ -88,12 +83,14 @@ export const setupAxiosInterceptors = () => {
         // 그 외 403(접근 거부, 강퇴 등)은 로그아웃 처리
         console.warn(`[Axios] 접근 거부(${errorCode}) -> 로그아웃`);
         handleForceLogout();
+        return Promise.reject(error);
       }
 
       // 세션 없음 (404)
       if (status === 404 && errorCode === 'S001') {
         // 세션을 못 찾음 -> 이미 삭제된 경우 -> 로그아웃
         handleForceLogout();
+        return Promise.reject(error);
       }
 
       // 액세스 토큰 만료 (401) -> 리프레시 시도
@@ -130,7 +127,7 @@ export const setupAxiosInterceptors = () => {
         try {
           // 리프레시 토큰으로 새 액세스 토큰 요청
           // (쿠키는 withCredentials=true 덕분에 자동으로 같이 감)
-          const { data } = await axios.post('/api/sessions/refresh');
+          const data = await sessionApi.refreshToken();
           
           if (data.status === 'ok') {
             const newAccessToken = data.accessToken;
@@ -152,7 +149,7 @@ export const setupAxiosInterceptors = () => {
             return axios(originalRequest);
           }
           throw new Error("토큰 리프레시 실패"); 
-        } catch (e) {
+        } catch (error) {
           // 갱신 실패 시 -> 다 같이 사망 (로그아웃)
           isRefreshing = false;
           refreshSubscribers = []; // 대기열 비움
@@ -161,11 +158,8 @@ export const setupAxiosInterceptors = () => {
           console.log("세션이 만료되어 강제 로그아웃 됩니다.");
           showToast("세션이 만료되었습니다. 다시 로그인해주세요.", "error");
           
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('myId');
-          
-          window.location.href = '/'; // 강제로 로그인 페이지로 이동
-          return Promise.reject(e);
+          handleForceLogout();
+          return Promise.reject(error);
         } finally {
           isRefreshing = false;
         }

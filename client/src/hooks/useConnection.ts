@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom'; // 주소 변경 감지용
-import axios from 'axios';
+import { sessionApi } from '../api/sessionApi';
 
-const WS_URL = import.meta.env.VITE_WS_URL;
+// 하드코딩된 주소 대신, 현재 브라우저 주소를 기반으로 설정
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = `${protocol}//${window.location.host}`; // host는 도메인+포트 포함
 
 export const useConnection = () => {
   const ws = useRef<WebSocket | null>(null);
@@ -56,7 +58,7 @@ export const useConnection = () => {
         if (event.code === 1006) {
           // 서버가 쫓아낸 건지 확인하기 위해 API 한번 찔러봄
           // 실패 시 axiosConfig.ts가 작동하여 로그인 페이지로 튕겨냄
-          axios.post('/api/sessions/refresh').catch(() => {
+          sessionApi.refreshToken().catch(() => {
             // 에러 처리는 axiosConfig가 전역적으로 수행함 (로그아웃 처리)
           });
         }

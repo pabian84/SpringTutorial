@@ -17,6 +17,7 @@ import com.example.demo.domain.user.entity.Session;
 import com.example.demo.domain.user.entity.User;
 import com.example.demo.domain.user.mapper.SessionMapper;
 import com.example.demo.domain.user.mapper.UserMapper;
+import com.example.demo.global.constant.SecurityConstants;
 import com.example.demo.global.exception.CustomException;
 import com.example.demo.global.exception.ErrorCode;
 import com.example.demo.global.security.JwtTokenProvider;
@@ -32,6 +33,7 @@ public class UserService {
     private final SessionMapper sessionMapper;
     private final PasswordEncoder passwordEncoder; // 암호화 기계
     private final JwtTokenProvider jwtTokenProvider; // 토큰 발급기
+    private final AccessLogService accessLogService;
 
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
@@ -82,32 +84,8 @@ public class UserService {
 
         // 로그 및 상태 업데이트
         userMapper.updateStatus(user.getId(), true);
-        // 로그 저장 객체 생성
-        String browser = "Unknown";
-        String os = "Unknown";
-        if (userAgent != null) {
-            if (userAgent.contains("Chrome")) browser = "Chrome";
-            else if (userAgent.contains("Firefox")) browser = "Firefox";
-            else if (userAgent.contains("Safari")) browser = "Safari";
-            
-            if (userAgent.contains("Windows")) os = "Windows";
-            else if (userAgent.contains("Mac")) os = "Mac";
-            else if (userAgent.contains("iOS")) os = "iOS";
-            else if (userAgent.contains("Linux")) os = "Linux";
-            else if (userAgent.contains("Android")) os = "Android";
-        }
-        AccessLog logData = AccessLog.builder()
-                .userId(user.getId())
-                .sessionId(session.getId())
-                .ipAddress(ipAddress)
-                .location(session.getLocation())
-                .userAgent(userAgent)
-                .browser(browser)
-                .os(os)
-                .endpoint("/api/user/login")
-                .type("LOGIN")
-                .build();
-        userMapper.saveLog(logData);
+        // 로그 저장
+        accessLogService.saveLog(user.getId(), session.getId(), SecurityConstants.TYPE_LOGIN, ipAddress, null, userAgent, "/api/user/login");
 
         // 5. 결과 반환 (쿠키 설정은 컨트롤러에게 위임)
         return LoginResult.builder()
@@ -121,40 +99,12 @@ public class UserService {
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
     public void logout(String userId, Long sessionId, String userAgent, String ipAddress) {
-        String location = "Unknown";
         // 1. DB에서 바로 삭제
         if (sessionId != null) {
-            Session session = sessionMapper.findBySessionId(sessionId);
-            location = session != null ? session.getLocation() : "Unknown";
             sessionMapper.deleteBySessionId(sessionId); // user_sessions에서 삭제
         }
-        String browser = "Unknown";
-        String os = "Unknown";
-        if (userAgent != null) {
-            if (userAgent.contains("Chrome")) browser = "Chrome";
-            else if (userAgent.contains("Firefox")) browser = "Firefox";
-            else if (userAgent.contains("Safari")) browser = "Safari";
-            
-            if (userAgent.contains("Windows")) os = "Windows";
-            else if (userAgent.contains("Mac")) os = "Mac";
-            else if (userAgent.contains("iOS")) os = "iOS";
-            else if (userAgent.contains("Linux")) os = "Linux";
-            else if (userAgent.contains("Android")) os = "Android";
-        }
-        log.info("browser: " + browser + ", os: " + os);
         // 2. 로그 기록
-        AccessLog logData = AccessLog.builder()
-                .userId(userId)
-                .sessionId(sessionId)
-                .ipAddress(ipAddress)
-                .location(location)
-                .userAgent(userAgent)
-                .browser(browser)
-                .os(os)
-                .endpoint("/api/user/logout") // 엔드포인트 명시
-                .type("LOGOUT")
-                .build();
-        userMapper.saveLog(logData);
+        accessLogService.saveLog(userId, sessionId, SecurityConstants.TYPE_LOGOUT, ipAddress, null, userAgent, "/api/user/logout");
     }
 
     // 반환 타입이 List<User> -> List<UserRes>로 변경

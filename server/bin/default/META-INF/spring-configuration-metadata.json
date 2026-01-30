@@ -1,12 +1,32 @@
 {
   "groups": [
     {
+      "name": "app.cors",
+      "type": "com.example.demo.global.config.CorsProperties",
+      "sourceType": "com.example.demo.global.config.CorsProperties"
+    },
+    {
       "name": "jwt",
       "type": "com.example.demo.global.config.JwtProperties",
       "sourceType": "com.example.demo.global.config.JwtProperties"
     }
   ],
   "properties": [
+    {
+      "name": "app.cors.allowed-origins",
+      "type": "java.util.List<java.lang.String>",
+      "sourceType": "com.example.demo.global.config.CorsProperties"
+    },
+    {
+      "name": "app.cors.hosts",
+      "type": "java.util.List<java.lang.String>",
+      "sourceType": "com.example.demo.global.config.CorsProperties"
+    },
+    {
+      "name": "app.cors.ports",
+      "type": "java.util.List<java.lang.Integer>",
+      "sourceType": "com.example.demo.global.config.CorsProperties"
+    },
     {
       "name": "jwt.access-token-validity-in-seconds",
       "type": "java.lang.Long",
