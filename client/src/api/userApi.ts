@@ -25,7 +25,7 @@ export const userApi = {
   },
 
   logs: async () => {
-    const { data } = await axios.get<AccessLogDTO[]>('api/users/logs');
+    const { data } = await axios.get<AccessLogDTO[]>('/api/users/logs');
     return data;
   }
 };

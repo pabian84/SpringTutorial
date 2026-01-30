@@ -119,6 +119,7 @@ export default function WidgetGridLayout({ layouts, widgets, onLayoutChange }: W
           rowHeight={30} // 그리드 한 칸의 높이 (px)
           // WidgetCard에 dragHandleClass를 전달하여 드래그 핸들 지정
           draggableHandle=".widget-drag-handle"
+          draggableCancel=".no-drag"
           useCSSTransforms={true} // 성능 향상
           isBounded={true} // 그리드 밖으로 못 나가게
           measureBeforeMount={false} // 미리 측정하지 않음

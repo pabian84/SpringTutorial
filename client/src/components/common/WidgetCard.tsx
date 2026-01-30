@@ -203,13 +203,14 @@ const WidgetCard = memo(({ id, title, icon, children, onExpand, onClose, isExpan
             {/* [우측] 버튼 */}
             <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
               {headerAction && (
-                <div style={{ marginRight: '5px', display: 'flex', alignItems: 'center' }}>
+                <div className='no-drag' style={{ marginRight: '5px', display: 'flex', alignItems: 'center' }}>
                   {headerAction}
                 </div>
               )}
               {/* 확장 버튼 */}
               {onExpand && !isExpanded && (
                 <button
+                  className='no-drag'
                   onClick={handleExpand}
                   style={{
                     background: 'none', border: 'none', color: '#aaa',
@@ -223,6 +224,7 @@ const WidgetCard = memo(({ id, title, icon, children, onExpand, onClose, isExpan
               {/* 닫기 버튼 */}
               {onClose && isExpanded && (
                 <button
+                  className='no-drag'
                   onClick={(e) => { e.stopPropagation(); onClose(); }}
                   style={{
                     background: 'none', border: 'none', color: '#fff',
