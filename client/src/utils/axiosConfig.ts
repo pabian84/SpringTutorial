@@ -60,6 +60,7 @@ export const setupAxiosInterceptors = () => {
 
       // 리프레시 요청 자체가 401(인증 실패) -> 즉시 강제 로그아웃
       if (originalRequest.url?.includes('/refresh') && status === 401) {
+        showToast('Case 1 !!!!!', 'error');
         console.warn("[Axios] 리프레시 토큰 만료됨 -> 강제 로그아웃");
         handleForceLogout();
         return Promise.reject(error);
@@ -67,6 +68,7 @@ export const setupAxiosInterceptors = () => {
 
       // 로그아웃 요청이 실패(401)했다? -> 이미 로그아웃 된 것임 -> 강제 이동시킴.
       if (originalRequest.url?.includes('/logout') && status === 401) {
+        showToast('Case 2 !!!!!', 'error');
         console.warn("[Axios] 로그아웃 요청 401 -> 강제 클리어 및 이동");
         handleForceLogout();
         return Promise.reject(error);
@@ -74,6 +76,7 @@ export const setupAxiosInterceptors = () => {
 
       // 권한 없음 / 강제 로그아웃 (403)
       if (status === 403) {
+        showToast('Case 3 !!!!!', 'error');
         // "내 기기 아님(A006)"은 
         // 로그아웃 시키면 안 됨 (그냥 에러 메시지만 띄움)
         if (errorCode === 'A006') {
@@ -89,6 +92,7 @@ export const setupAxiosInterceptors = () => {
 
       // 세션 없음 (404)
       if (status === 404 && errorCode === 'S001') {
+        showToast('Case 4 !!!!!', 'error');
         // 세션을 못 찾음 -> 이미 삭제된 경우 -> 로그아웃
         handleForceLogout();
         return Promise.reject(error);
@@ -99,6 +103,7 @@ export const setupAxiosInterceptors = () => {
       // 만약 EntryPoint를 구현해서 "A003"을 준다면 명확히 구분 가능.
       // 현재는 코드가 없거나, "A002"(Invalid), "A003"(Expired)일 때 시도.
       if (status === 401 && !originalRequest._retry) {
+        showToast('Case 5 !!!!!', 'error');
         // 만약 "비밀번호 불일치(A001)" 같은 401이라면 리프레시 할 필요 없음 (로그인 창에서 난 에러니까)
         if (errorCode === 'A001') {
             return Promise.reject(error);
@@ -125,6 +130,7 @@ export const setupAxiosInterceptors = () => {
         isRefreshing = true;
 
         try {
+          showToast('Case 6 !!!!!', 'error');
           // 리프레시 토큰으로 새 액세스 토큰 요청
           // (쿠키는 withCredentials=true 덕분에 자동으로 같이 감)
           const data = await sessionApi.refreshToken();
@@ -150,6 +156,7 @@ export const setupAxiosInterceptors = () => {
           }
           throw new Error("토큰 리프레시 실패"); 
         } catch (error) {
+          showToast('Case 7 !!!!!', 'error');
           // 갱신 실패 시 -> 다 같이 사망 (로그아웃)
           isRefreshing = false;
           refreshSubscribers = []; // 대기열 비움

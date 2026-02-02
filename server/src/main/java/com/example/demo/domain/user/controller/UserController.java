@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.demo.domain.user.dto.LoginReq;
 import com.example.demo.domain.user.dto.LoginRes;
 import com.example.demo.domain.user.entity.AccessLog;
+import com.example.demo.domain.user.service.SessionService;
 import com.example.demo.domain.user.service.UserService;
 import com.example.demo.global.security.JwtTokenProvider;
-import com.example.demo.handler.UserConnectionHandler;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,11 +35,11 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
 public class UserController {
+
+    private final SessionService sessionService;
     private final UserService userService;
     // 토큰 해석기 (세션 ID 꺼내기용)
     private final JwtTokenProvider jwtTokenProvider;
-    // 소켓 핸들러 (강제 연결 끊기용)
-    private final UserConnectionHandler userConnectionHandler;
 
     @Operation(summary = "로그인")
     @PostMapping("/login")
@@ -103,7 +103,7 @@ public class UserController {
             // 서비스에는 세션 ID를 넘겨서 DB 삭제
             userService.logout(userId, sessionId, userAgent, ipAddress); 
             // 내 소켓도 즉시 끊어버리기 (좀비 방지)
-            userConnectionHandler.forceDisconnectOne(userId, sessionId);
+            sessionService.forceDisconnectOne(userId, sessionId);
         }
         
         // 쿠키 삭제

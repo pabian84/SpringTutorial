@@ -55,7 +55,7 @@ public class SecurityConfig {
             .sessionManagement(session -> 
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 끄기 (JWT 필수)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/user/login", "/api/sessions/refresh", "/ws/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll() // 로그인, 소켓, 문서는 통과
+                .requestMatchers("/api/user/login", "/api/sessions/refresh", "/ws", "/swagger-ui/**", "/v3/api-docs/**").permitAll() // 로그인, 소켓, 문서는 통과
                 .anyRequest().authenticated() // 나머지는 출입증(JWT) 검사
             )
             // JWT 검사 필터를 먼저 실행

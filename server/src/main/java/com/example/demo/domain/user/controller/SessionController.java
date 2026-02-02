@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.domain.user.service.SessionService;
 import com.example.demo.global.security.JwtTokenProvider;
-import com.example.demo.handler.UserConnectionHandler;
 
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,7 +30,6 @@ import lombok.extern.slf4j.Slf4j;
 public class SessionController {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserConnectionHandler userConnectionHandler;
     private final SessionService sessionService;
 
     @Operation(summary = "쿠키에 있는 refreshToken을 사용하여 accessToken 갱신")
@@ -69,7 +67,7 @@ public class SessionController {
             sessionService.deleteSession(targetSessionId, currentSessionId);
             
             // 소켓 끊기 (이건 Presentation Layer인 컨트롤러가 Handler를 호출하는 게 맞음)
-            userConnectionHandler.forceDisconnectOne(currentUserId, targetSessionId);
+            sessionService.forceDisconnectOne(currentUserId, targetSessionId);
             
             return ResponseEntity.ok("선택한 기기를 로그아웃 시켰습니다.");
         } catch (IllegalArgumentException e) {
@@ -99,7 +97,7 @@ public class SessionController {
         // DB 삭제 실행
         sessionService.deleteOtherSessions(userId, currentSessionId);
         // 소켓 끊기
-        userConnectionHandler.forceDisconnectOthers(userId, currentSessionId);
+        sessionService.forceDisconnectOthers(userId, currentSessionId);
         
         return ResponseEntity.ok("다른 모든 기기에서 로그아웃 되었습니다.");
     }
@@ -123,7 +121,7 @@ public class SessionController {
         // DB 삭제
         sessionService.deleteAllSessions(userId, currentSessionId);
         // 소켓 끊기
-        userConnectionHandler.forceDisconnectAll(userId);
+        sessionService.forceDisconnectAll(userId);
         
         ResponseCookie cookie = ResponseCookie.from("refreshToken", "").maxAge(0).path("/").build();
         return ResponseEntity.ok().header("Set-Cookie", cookie.toString()).body("전체 로그아웃 완료");

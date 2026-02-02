@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import type { SystemStatusDTO } from '../types/dtos';
 import { showToast } from '../utils/Alert';
 
@@ -13,10 +14,6 @@ const INITIAL_DATA = Array(MAX_DATA_POINTS).fill({
   memoryPercent: 0 
 });
 
-// 하드코딩된 주소 대신, 현재 브라우저 주소를 기반으로 설정
-const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_URL = `${protocol}//${window.location.host}`; // host는 도메인+포트 포함
-
 interface ChartProps {
   data: SystemStatusDTO[];
 }
@@ -28,85 +25,53 @@ export default function ServerMonitor({ data }: ChartProps) {
 
 export function StandaloneServerMonitor() {
   const [systemData, setSystemData] = useState<SystemStatusDTO[]>(INITIAL_DATA);
-  const ws = useRef<WebSocket | null>(null);
+  // new WebSocket() 대신 통합 훅 사용
+  const { lastMessage } = useWebSocket();
+  // 토스트 알림 쿨타임 관리용 Ref (재렌더링 없이 값 저장)
+  const lastToastTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    // 이미 연결되어 있으면 패스 (중복 연결 방지)
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      return;
-    }
-    // 1. 웹소켓 연결
-    // (이전 소켓이 닫히는 중이거나 닫혀있으면 새로 연결)
-    if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
-      ws.current = new WebSocket(`${WS_URL}/ws/dashboard`);
-      ws.current.onopen = () => console.log('서버 모니터링 연결 성공');
-      ws.current.onmessage = (event) => {
-        try {
-          // 2. 서버에서 온 데이터 파싱
-          const message = JSON.parse(event.data);
-          
-          // [Type 1] 시스템 상태만 처리 (차트용)
-          if (message.type === 'SYSTEM_STATUS') {
-            const timeStr = new Date().toLocaleTimeString('en-GB', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: false
-            });
+    // 로직을 내부 함수로 분리하여 useEffect의 역할을 명확히 함
+    const processSystemStatus = () => {
+      // 1. 데이터 유효성 검사 (타입 가드)
+      if (!lastMessage || lastMessage.type !== 'SYSTEM_STATUS') return;
 
-            // [수정 2] 확실하게 숫자로 변환 (안전장치)
-            const type = message.type;
-            const time = message.time ? message.time : timeStr;
-            const cpu = Number(message.cpu);
-            const cpuPercent = Number(message.cpuPercent);
-            const memory = Number(message.memory);
-            const memoryPercent = Number(message.memoryPercent);
+      const newData = lastMessage as SystemStatusDTO;
+      const timeStr = new Date().toLocaleTimeString('en-GB', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
 
-            // [추가] 위험 상황 발생 시 토스트 알림!
-            // (너무 자주 뜨면 시끄러우니까 CPU 80 넘을 때만)
-            if (cpuPercent > 80) {
-                // 여기서 showToast를 호출하면, 
-                // 사용자가 메모 삭제 모달을 보고 있어도 우측 상단에 알림이 "샥" 하고 뜹니다.
-                showToast('CPU 과부하 경고!', 'error');
-            }
+      // 2. 데이터 정제 (숫자 변환)
+      const type = newData.type;
+      const time = newData.time ? newData.time : timeStr;
+      const cpu = Number(newData.cpu);
+      const cpuPercent = Number(newData.cpuPercent);
+      const memory = Number(newData.memory);
+      const memoryPercent = Number(newData.memoryPercent);
 
-            // 3. 차트 데이터 업데이트 (최근 20개만 유지)
-            setSystemData(prev => {
-              const newData = { 
-                type: type,
-                time: time,
-                cpu: cpu,
-                cpuPercent: cpuPercent,
-                memory: memory, 
-                memoryPercent: memoryPercent,
-              };
-              
-              // 데이터 밀어내기 (오른쪽 -> 왼쪽 흐름)
-              return [...prev.slice(1), newData];
-            });
-          }
-        } catch (error) {
-          console.error('메시지 처리 중 오류 발생:', error);
-        }
-      };
-      ws.current.onclose = () => {
-        console.log('서버 모니터링 연결 해제');
-        ws.current = null;
-      };
-      ws.current.onerror = (error) => console.error('WebSocket Error:', error);
-    }
-    // 4. 화면이 꺼질 때 연결 끊기 (필수)
-    return () => {
-      if (ws.current) {
-        if (ws.current.readyState === WebSocket.OPEN) {
-          ws.current.onopen = null;
-          ws.current.onmessage = null;
-          ws.current.onerror = null;
-          ws.current.close();
+      // 3. [보완] CPU 과부하 경고 (쿨타임 적용)
+      if (cpuPercent > 80) {
+        const now = Date.now();
+        // 마지막 알림 후 3초(3000ms)가 지났는지 확인
+        if (now - lastToastTimeRef.current > 3000) {
+          showToast(`CPU 과부하 경고! (${cpuPercent.toFixed(1)}%)`, 'error');
+          lastToastTimeRef.current = now; // 알림 보낸 시간 갱신
         }
       }
+      
+      // 4. 차트 데이터 업데이트
+      setSystemData(prev => {
+        const newEntry = { 
+          type, time, cpu, cpuPercent, memory, memoryPercent
+        };
+        // 배열의 앞부분(오래된 데이터) 하나 자르고, 새 데이터 뒤에 붙임
+        return [...prev.slice(1), newEntry];
+      });
     };
-  }, []);
+
+    // 함수 실행
+    processSystemStatus();
+  }, [lastMessage]);
 
   // UI는 공통 컴포넌트에 위임
   return <ServerStatusChart data={systemData} />;

@@ -1,29 +1,25 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sessionApi } from '../api/sessionApi';
 import { userApi } from '../api/userApi';
 import { chatApi, financeApi, memoApi, statsApi } from '../api/widgetApi';
-import type { ChatHistoryDTO, CodeData, SystemStatusDTO } from '../types/dtos';
+import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusDTO } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
-
-// 하드코딩된 주소 대신, 현재 브라우저 주소를 기반으로 설정
-const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_URL = `${protocol}//${window.location.host}`; // host는 도메인+포트 포함
+import { useWebSocket } from '../contexts/WebSocketContext';
 
 export const useDashboardData = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const myId = localStorage.getItem('myId');
   
+  // Context 사용
+  const { lastMessage, sendMessage } = useWebSocket();
+  
   // 상태 관리
   const [chatMessages, setChatMessages] = useState<ChatHistoryDTO[]>([]);
   const [serverData, setServerData] = useState<SystemStatusDTO[]>([]);
   
-  // 소켓 Refs
-  const chatWs = useRef<WebSocket | null>(null);
-  const dashboardWs = useRef<WebSocket | null>(null);
-
   // 1. 유저 인증 체크
   useEffect(() => {
     if (!myId) {
@@ -106,12 +102,17 @@ export const useDashboardData = () => {
     queryFn: async () => {
       try {
         const data = await chatApi.getHistory();
-        if (Array.isArray(data)) {
-          setChatMessages(data);
-        } else {
-          setChatMessages([]);
-        }
-        return data;
+        // API 응답(ChatHistoryDTO)을 소켓 메시지 타입(ChatMessage)으로 변환
+        const formattedData: ChatMessage[] = Array.isArray(data) 
+          ? data.map(d => ({
+              type: 'CHAT',
+              sender: d.sender,
+              text: d.text,
+              createdAt: d.createdAt || new Date().toISOString()
+            }))
+          : [];
+        setChatMessages(formattedData);
+        return formattedData;
       } catch (e) {
         console.error('채팅 기록을 가져 올 수 없습니다', e);
         return [];
@@ -120,75 +121,50 @@ export const useDashboardData = () => {
     refetchOnWindowFocus: false,
   });
 
-  // 7. WebSocket 연결 (Dashboard & Chat)
+  // === [WebSocket 수신 처리] ===
   useEffect(() => {
-    // 1. 토큰 확인 (토큰이 없으면 연결 시도조차 하지 않음)
-    const token = localStorage.getItem('accessToken');
-    
-    // 로그아웃 상태면 연결 끊기
-    if (!token) {
-      return;
-    }
-    // Dashboard WS
-    if (!dashboardWs.current || dashboardWs.current.readyState === WebSocket.CLOSED) {
-      dashboardWs.current = new WebSocket(`${WS_URL}/ws/dashboard?token=${token}`);
-      dashboardWs.current.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          if (message.type === 'USER_UPDATE') {
-            queryClient.invalidateQueries({ queryKey: ['onlineUsers'] });
-          } else if (message.type === 'SYSTEM_STATUS') {
-            const timeStr = new Date().toLocaleTimeString('en-GB', {
-              hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-            });
-            setServerData(prev => {
-              const newData = { ...message, time: message.time || timeStr };
-              const updated = [...prev, newData];
-              return updated.length > 20 ? updated.slice(updated.length - 20) : updated;
-            });
-          }
-        } catch (e) { console.error(e); }
-      };
-    }
+    if (!lastMessage) return;
 
-    // Chat WS
-    if (!chatWs.current || chatWs.current.readyState === WebSocket.CLOSED) {
-      chatWs.current = new WebSocket(`${WS_URL}/ws/chat?token=${token}`);
-      chatWs.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data && typeof data === 'object') {
-            setChatMessages(prev => [...prev, data]);
-          }
-        } catch (e) { console.error(e); }
-      };
+    // Discriminated Union 덕분에 switch-case에서 타입 추론 완벽 지원
+    switch (lastMessage.type) {
+      case 'SYSTEM_STATUS':
+        // 여기서 lastMessage는 자동으로 SystemStatusMessage 타입이 됨
+        setServerData((prev) => {
+          const updated = [...prev, lastMessage];
+          return updated.length > 20 ? updated.slice(updated.length - 20) : updated;
+        });
+        break;
+
+      case 'CHAT':
+        // 여기서 lastMessage는 자동으로 ChatMessage 타입이 됨
+        setChatMessages((prev) => [...prev, lastMessage]);
+        break;
+
+      case 'USER_UPDATE':
+        // 여기서 lastMessage는 UserUpdateMessage
+        queryClient.invalidateQueries({ queryKey: ['onlineUsers'] });
+        break;
+
+      case 'MEMO_UPDATE':
+        queryClient.invalidateQueries({ queryKey: ['memos'] });
+        break;
+
+      case 'FORCE_LOGOUT':
+        showToast('다른 기기에서 접속하여 로그아웃되었습니다.', 'error');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('myId');
+        navigate('/');
+        break;
     }
+  }, [lastMessage, queryClient, navigate]);
 
-    return () => {
-        if (dashboardWs.current) {
-          if (dashboardWs.current.readyState === WebSocket.OPEN) {
-            dashboardWs.current.onopen = null;
-            dashboardWs.current.onmessage = null;
-            dashboardWs.current.close();
-        }
-        }
-        if (chatWs.current) {
-          if (chatWs.current.readyState === WebSocket.OPEN) {
-            chatWs.current.onopen = null;
-            chatWs.current.onmessage = null;
-            chatWs.current.onerror = null;
-            chatWs.current.close();
-          }
-        }
-    };
-  }, [queryClient]);
-
-  // 메시지 전송
+  // === [메시지 전송] ===
   const handleSendMessage = useCallback((text: string) => {
-    if (chatWs.current?.readyState === WebSocket.OPEN && myId) {
-      chatWs.current.send(JSON.stringify({ sender: myId, text }));
+    if (myId) {
+      // SendChatMessage 타입에 맞춰 전송
+      sendMessage({ type: 'CHAT', sender: myId, text });
     }
-  }, [myId]);
+  }, [myId, sendMessage]);
 
   // 로그아웃
   const handleLogout = async () => {

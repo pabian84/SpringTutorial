@@ -10,9 +10,12 @@ import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
-@Service
-public class CodeStatsService {
+import lombok.RequiredArgsConstructor;
 
+@Service
+@RequiredArgsConstructor
+public class CodeStatsService {
+    
     public Map<String, Long> getCodeStatistics() {
         Map<String, Long> stats = new HashMap<>();
         // 초기값 0 설정

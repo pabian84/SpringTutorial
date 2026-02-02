@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { useConnection } from './hooks/useConnection';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { useWebSocket } from './contexts/WebSocketContext';
 import CesiumDetail from './pages/CesiumDetail';
 import Dashboard from './pages/Dashboard';
 import DeviceManagement from './pages/DeviceManagement';
@@ -14,12 +14,23 @@ import './styles/toast.css';
 // [1] 'AppContent'라는 새 컴포넌트를 정의합니다. (이름은 제가 지은 겁니다)
 // 이 친구는 <BrowserRouter> 안에서 실행될 녀석이라 useConnection(주소감지)을 쓸 수 있습니다.
 function AppContent() {
-  // 여기서 주소 변경을 감시합니다. (이제 안전함!)
-  useConnection(); 
-
   // 앱 시작 시 토큰이 있으면 대시보드로 납치하는 로직
   const navigate = useNavigate();
   const location = useLocation();
+
+  // 훅에서 lastMessage를 꺼냅니다.
+  const { lastMessage } = useWebSocket();
+
+  // 전역 소켓 이벤트 감지 (모든 페이지 공통)
+  useEffect(() => {
+    if (lastMessage?.type === 'FORCE_LOGOUT') {
+      console.warn("강제 로그아웃 감지!");
+      // 토스트 메시지 등 처리
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('myId');
+      navigate('/');
+    }
+  }, [lastMessage, navigate]);
 
   useEffect(() => {
     // 1. 저장소에서 토큰 확인 (로그인 유지 체크했으면 local, 아니면 session에 있음)
@@ -61,10 +72,10 @@ function AppContent() {
 // [2] 기존 App 컴포넌트는 '껍데기' 역할만 합니다.
 function App() {
   return (
-    <BrowserRouter>
+    <>
       {/* 여기서 방금 만든 AppContent를 불러옵니다 */}
       <AppContent />
-    </BrowserRouter>
+    </>
   );
 }
 export default App

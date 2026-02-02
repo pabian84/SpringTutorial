@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { UserLocationContext, type LocationState } from './UserLocationContext';
 import { showToast } from '../utils/Alert';
+import { useLocation } from 'react-router-dom';
 
 // [유틸] 캐시된 위치 가져오기 (내부 사용)
 const getCachedLocation = () => {
@@ -29,9 +30,14 @@ function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon
 
 // Provider 컴포넌트
 export const UserLocationProvider = ({ children }: { children: React.ReactNode }) => {
+  const { pathname } = useLocation(); // 현재 경로 가져오기
   
   // 1. 초기화 시점에 GPS 지원 여부와 캐시를 모두 확인 (렌더링 충돌 방지 정석)
   const [location, setLocation] = useState<LocationState>(() => {
+    // 로그인 페이지면 무조건 null 상태로 시작 (권한 체크도 안 함)
+    if (pathname === '/') {
+        return { lat: null, lon: null, loading: false, error: null };
+    }
     // GPS 미지원 체크
     if (!navigator.geolocation) {
       return { lat: null, lon: null, loading: false, error: 'GPS 미지원 브라우저' };
@@ -52,7 +58,8 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
 
   // 위치 감시 시작
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    // 로그인 페이지('/')거나 GPS 없으면 아예 로직 실행 안 함
+    if (pathname === '/' || !navigator.geolocation) return;
     
     let watchId: number | null = null;
 
@@ -138,7 +145,7 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
         navigator.geolocation.clearWatch(watchId);
       };
     };
-  }, []);
+  }, [pathname]);
 
   return (
     <UserLocationContext.Provider value={location}>

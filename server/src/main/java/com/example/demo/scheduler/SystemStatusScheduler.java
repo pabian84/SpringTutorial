@@ -1,10 +1,14 @@
 package com.example.demo.scheduler;
 
+import java.util.Map;
+
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.example.demo.domain.stats.service.SystemStatusService;
 import com.example.demo.domain.user.mapper.SessionMapper;
-import com.example.demo.handler.DashboardHandler;
+import com.example.demo.handler.WebSocketHandler;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,13 +18,24 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class SystemStatusScheduler {
 
-    private final DashboardHandler dashboardHandler;
     private final SessionMapper sessionMapper;
+
+    private final WebSocketHandler webSocketHandler;
+    private final SystemStatusService systemStatusService; // [수정] Service 주입
+    private final ObjectMapper objectMapper;
 
     // 0.5초마다 방송 버튼 누름
     @Scheduled(fixedRate = 500)
     public void sendSystemStatus() {
-        dashboardHandler.broadcastSystemStats();
+        try {
+            // 1. Service에서 데이터 가져오기 (Logic)
+            Map<String, Object> stats = systemStatusService.getCurrentSystemStatus();
+            
+            // 2. Handler로 방송하기 (View/Routing)
+            webSocketHandler.broadcast(objectMapper.writeValueAsString(stats));
+        } catch (Exception e) {
+            log.error("시스템 상태 방송 실패", e);
+        }
     }
 
     // 매일 새벽 4시에 실행

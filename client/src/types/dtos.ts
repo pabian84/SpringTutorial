@@ -134,3 +134,58 @@ export type ErrorCode =
   | 'A006' // 내 기기 아님
   | 'S001' // 세션 찾을 수 없음
   | 'C001'; // 잘못된 입력
+
+
+
+// 1. 시스템 상태 (SystemStatusService.java)
+export interface SystemStatusMessage {
+  type: 'SYSTEM_STATUS';
+  time: string;
+  cpu: number;
+  cpuPercent: number;
+  memory: number;
+  memoryPercent: number;
+}
+
+// 2. 채팅 메시지 (ChatService.java)
+export interface ChatMessage {
+  type: 'CHAT';
+  sender: string;
+  text: string;
+  createdAt: string;
+}
+
+// 3. 접속자 수 업데이트 (SessionService.java)
+export interface UserUpdateMessage {
+  type: 'USER_UPDATE';
+  onlineUserCount: number;
+}
+
+// 4. 메모 업데이트 알림 (MemoController.java)
+export interface MemoUpdateMessage {
+  type: 'MEMO_UPDATE';
+  userId?: string;
+}
+
+// 5. 강제 로그아웃 (SessionService.java - forceDisconnect)
+export interface ForceLogoutMessage {
+  type: 'FORCE_LOGOUT'; // 프론트에서 처리할 타입 명시 (에러코드 4001 등)
+  reason?: string;
+}
+
+// [핵심] 모든 소켓 메시지의 합집합 (Discriminated Union)
+export type WebSocketMessage = 
+  | SystemStatusMessage 
+  | ChatMessage 
+  | UserUpdateMessage 
+  | MemoUpdateMessage
+  | ForceLogoutMessage;
+
+// [클라이언트 발신용] 채팅 보낼 때 사용
+export interface SendChatMessage {
+  type: 'CHAT';
+  sender: string;
+  text: string;
+}
+
+export type WebSocketSendMessage = SendChatMessage; // 추후 발신 타입 추가 가능
