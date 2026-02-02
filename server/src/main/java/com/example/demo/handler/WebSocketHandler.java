@@ -41,10 +41,11 @@ public class WebSocketHandler extends TextWebSocketHandler {
         
         // 유저 ID 파싱 및 온라인 처리 (UserConnectionHandler 로직)
         String userId = getUserIdFromSession(session);
-        System.out.println("userId 연결 시도: " + userId);
+        log.info("userId 연결 시도: " + userId);
         if (userId == null) {
             // ID 없으면 끊기 (보안)
             session.close(CloseStatus.BAD_DATA);
+            log.debug("userId is null");
             return;
         }
 
@@ -71,6 +72,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
             log.error("메시지 타입이 null 입니다.");
             return;
         }
+        log.debug("메시지 수신, type: " + type);
 
         // [라우팅] 타입에 따라 담당자에게 위임
         switch (type) {

@@ -134,6 +134,12 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
             }
           }
         };
+      })
+      .catch((error) => {
+        // [핵심] HTTP 환경 등에서 Permission API가 실패할 경우 여기로 진입
+          console.warn("⚠️ Permissions API 에러 (HTTP 환경일 가능성 높음), 강제 실행 시도:", error);
+          // API 확인이 실패해도 startWatching을 실행해야 watchPosition의 에러 콜백이라도 터져서 로딩이 끝남
+          startWatching();
       });
     } else {
       // 구형 브라우저 등 Permissions API가 없는 경우 그냥 실행

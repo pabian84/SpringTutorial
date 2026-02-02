@@ -64,7 +64,12 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
       if (event.code === 1006) {
         console.warn("⚠️ 1006 비정상 종료 감지: 토큰 갱신 시도");
         sessionApi.refreshToken()
-          .then(() => console.log("✅ 토큰 갱신 성공, 재연결 대기..."))
+          .then((res) => {
+            console.log("✅ 토큰 갱신 성공, 재연결 대기...");
+            if (res && res.accessToken) {
+              localStorage.setItem('accessToken', res.accessToken);
+            }
+          })
           .catch((err) => {
             console.error("❌ 토큰 갱신 실패, 로그아웃 처리 예정", err);
             // axiosConfig 인터셉터가 로그아웃 처리하겠지만, 여기서도 안전하게 연결 중단

@@ -21,8 +21,8 @@ public class SystemStatusScheduler {
     private final SessionMapper sessionMapper;
 
     private final WebSocketHandler webSocketHandler;
-    private final SystemStatusService systemStatusService; // [수정] Service 주입
-    private final ObjectMapper objectMapper;
+    private final SystemStatusService systemStatusService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // 0.5초마다 방송 버튼 누름
     @Scheduled(fixedRate = 500)
