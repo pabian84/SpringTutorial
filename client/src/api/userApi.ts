@@ -1,10 +1,10 @@
 import axios from 'axios';
-import type { AccessLogDTO, LoginResultDTO, UserDTO } from '../types/dtos';
+import type { AccessLogDTO, LoginResDTO, UserDTO } from '../types/dtos';
 
 export const userApi = {
   // 로그인
   login: async (id: string, password: string, isRememberMe: boolean) => {
-    const { data } = await axios.post<LoginResultDTO>('/api/user/login', { 
+    const { data } = await axios.post<LoginResDTO>('/api/user/login', { 
       id, 
       password,
       isRememberMe 

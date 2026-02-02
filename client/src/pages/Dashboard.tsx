@@ -57,28 +57,28 @@ const defaultLayouts: RGL_Layouts = {
     { i: 'three', x: 0, y: 46, w: 6, h: 8 },
   ],
   xs: [
-    { i: 'weather', x: 0, y: 0, w: 4, h: 6 },
-    { i: 'online', x: 0, y: 6, w: 4, h: 4 },
-    { i: 'map', x: 0, y: 10, w: 4, h: 6 },
-    { i: 'cesium', x: 0, y: 16, w: 4, h: 6 },
-    { i: 'exchange', x: 0, y: 22, w: 4, h: 6 },
-    { i: 'code', x: 0, y: 28, w: 4, h: 6 },
-    { i: 'server', x: 0, y: 34, w: 4, h: 6 },
-    { i: 'memo', x: 0, y: 40, w: 4, h: 6 },
-    { i: 'chat', x: 0, y: 46, w: 4, h: 8 },
-    { i: 'three', x: 0, y: 52, w: 4, h: 8 },
+    { i: 'weather', x: 0, y: 0, w: 4, h: 8 },
+    { i: 'online', x: 0, y: 8, w: 4, h: 4 },
+    { i: 'map', x: 0, y: 12, w: 4, h: 6 },
+    { i: 'cesium', x: 0, y: 18, w: 4, h: 6 },
+    { i: 'exchange', x: 0, y: 24, w: 4, h: 6 },
+    { i: 'code', x: 0, y: 30, w: 4, h: 6 },
+    { i: 'server', x: 0, y: 36, w: 4, h: 6 },
+    { i: 'memo', x: 0, y: 42, w: 4, h: 6 },
+    { i: 'chat', x: 0, y: 48, w: 4, h: 8 },
+    { i: 'three', x: 0, y: 57, w: 4, h: 8 },
   ],
   xxs: [
-    { i: 'weather', x: 0, y: 0, w: 2, h: 6 },
-    { i: 'online', x: 0, y: 6, w: 2, h: 4 },
-    { i: 'map', x: 0, y: 10, w: 2, h: 6 },
-    { i: 'cesium', x: 0, y: 16, w: 2, h: 6 },
-    { i: 'exchange', x: 0, y: 22, w: 2, h: 6 },
-    { i: 'code', x: 0, y: 28, w: 2, h: 6 },
-    { i: 'server', x: 0, y: 34, w: 2, h: 6 },
-    { i: 'memo', x: 0, y: 40, w: 2, h: 6 },
-    { i: 'chat', x: 0, y: 46, w: 2, h: 8 },
-    { i: 'three', x: 0, y: 54, w: 2, h: 6 },
+    { i: 'weather', x: 0, y: 0, w: 2, h: 8 },
+    { i: 'online', x: 0, y: 8, w: 2, h: 4 },
+    { i: 'map', x: 0, y: 12, w: 2, h: 6 },
+    { i: 'cesium', x: 0, y: 18, w: 2, h: 6 },
+    { i: 'exchange', x: 0, y: 24, w: 2, h: 6 },
+    { i: 'code', x: 0, y: 30, w: 2, h: 6 },
+    { i: 'server', x: 0, y: 36, w: 2, h: 6 },
+    { i: 'memo', x: 0, y: 42, w: 2, h: 6 },
+    { i: 'chat', x: 0, y: 48, w: 2, h: 8 },
+    { i: 'three', x: 0, y: 56, w: 2, h: 8 },
   ]
 };
 
@@ -92,7 +92,7 @@ export default function Dashboard() {
   } = useDashboardData();
   
   const { lat, lon, loading: locLoading } = useUserLocation();
-  // [수정 핵심] 지연 초기화 (Lazy Initialization)
+  // 지연 초기화 (Lazy Initialization)
   // 컴포넌트 최초 렌더링 시점에 LocalStorage를 동기적으로 읽어옵니다.
   const [layouts, setLayouts] = useState<RGL_Layouts>(() => {
     try {
@@ -108,11 +108,14 @@ export default function Dashboard() {
     return defaultLayouts;
   });
 
+  const [isCompactMode, setIsCompactMode] = useState(false);
   // [핸들러] 레이아웃 변경 시 LocalStorage에 저장
-  const handleLayoutChange = useCallback((newLayouts: RGL_Layouts) => {
-    console.log('handleLayoutChange!');
+  const handleLayoutChange = useCallback((newLayouts: RGL_Layouts, breakpoint: string) => {
+    console.log('Layout Changed:', breakpoint);
     setLayouts(newLayouts);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newLayouts));
+    const isSmall = ['xxs'].includes(breakpoint);
+    setIsCompactMode(isSmall);
   }, []);
 
   /**
@@ -258,7 +261,7 @@ export default function Dashboard() {
             title="로그인된 기기 관리"
           >
             <FaDesktop size={16} />
-            기기 관리
+            {!isCompactMode && "기기 관리"}
           </button>
           <button onClick={handleLogout}
             style={{
@@ -269,7 +272,7 @@ export default function Dashboard() {
             }}
           >
             <FaSignOutAlt size={16} />
-            System Logout
+            {!isCompactMode && "System Logout"}
           </button>
         </div>
       </header>

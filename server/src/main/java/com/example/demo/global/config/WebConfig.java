@@ -6,5 +6,5 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-    // TODO: addResourceHandlers 추가 계획    
+    // TODO: addResourceHandlers 추가 계획
 }

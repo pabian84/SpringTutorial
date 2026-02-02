@@ -47,6 +47,8 @@ button {
   font-weight: bold;
   cursor: pointer;
   transition: background-color 0.2s, transform 0.1s;
+  min-width: 45px;
+  justify-content: center;
 }
 
 button:hover {

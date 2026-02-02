@@ -38,8 +38,7 @@ public class SessionController {
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@CookieValue(value = "refreshToken", required = false) String refreshToken) {
         try {
-            Map<String, Object> result = sessionService.refresh(refreshToken);
-            return ResponseEntity.ok(result);
+            return ResponseEntity.ok(sessionService.refresh(refreshToken));
         } catch (Exception e) {
             ResponseCookie cookie = ResponseCookie.from("refreshToken", "").maxAge(0).path("/").build();
             return ResponseEntity.status(401).header("Set-Cookie", cookie.toString()).body("토큰 만료");

@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.domain.user.dto.LoginReq;
-import com.example.demo.domain.user.dto.LoginResult;
+import com.example.demo.domain.user.dto.LoginRes;
 import com.example.demo.domain.user.entity.AccessLog;
 import com.example.demo.domain.user.service.UserService;
 import com.example.demo.global.security.JwtTokenProvider;
@@ -49,7 +49,7 @@ public class UserController {
             String ipAddress = request.getRemoteAddr();
             String userAgent = request.getHeader("User-Agent");
             // 서비스 호출
-            LoginResult result = userService.login(req, userAgent, ipAddress);
+            LoginRes result = userService.login(req, userAgent, ipAddress);
             int maxAge;
             // 로그인 유지 체크 여부에 따른 수명 결정
             if (req.isRememberMe()) {

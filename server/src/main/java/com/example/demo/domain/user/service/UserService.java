@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.domain.user.dto.LoginReq;
-import com.example.demo.domain.user.dto.LoginResult;
+import com.example.demo.domain.user.dto.LoginRes;
 import com.example.demo.domain.user.dto.UserRes;
 import com.example.demo.domain.user.entity.AccessLog;
 import com.example.demo.domain.user.entity.Session;
@@ -37,7 +37,7 @@ public class UserService {
 
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
-    public LoginResult login(LoginReq loginReq, String userAgent, String ipAddress) {
+    public LoginRes login(LoginReq loginReq, String userAgent, String ipAddress) {
         // 1. 유저 검증
         User user = userMapper.findById(loginReq.getId());
         if (user == null) {
@@ -88,7 +88,7 @@ public class UserService {
         accessLogService.saveLog(user.getId(), session.getId(), SecurityConstants.TYPE_LOGIN, ipAddress, null, userAgent, "/api/user/login");
 
         // 5. 결과 반환 (쿠키 설정은 컨트롤러에게 위임)
-        return LoginResult.builder()
+        return LoginRes.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .user(user)

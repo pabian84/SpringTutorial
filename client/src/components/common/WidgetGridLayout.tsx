@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -33,7 +33,7 @@ export interface WidgetConfig {
 interface WidgetdGridLayoutProps {
   layouts: RGL_Layouts;
   widgets: WidgetConfig[];
-  onLayoutChange?: (layouts: RGL_Layouts) => void;
+  onLayoutChange?: (layouts: RGL_Layouts, breakpoint: string) => void;
 }
 
 /**
@@ -43,7 +43,8 @@ interface WidgetdGridLayoutProps {
 export default function WidgetGridLayout({ layouts, widgets, onLayoutChange }: WidgetdGridLayoutProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
-
+  const currentBreakpointRef = useRef<string>('lg');
+  
   useEffect(() => {
     const init = () => setIsMounted(true);
     init();
@@ -123,15 +124,18 @@ export default function WidgetGridLayout({ layouts, widgets, onLayoutChange }: W
           useCSSTransforms={true} // 성능 향상
           isBounded={true} // 그리드 밖으로 못 나가게
           measureBeforeMount={false} // 미리 측정하지 않음
+          onBreakpointChange={(newBreakpoint) => {
+            currentBreakpointRef.current = newBreakpoint;
+          }}
           onLayoutChange={(_currentLayout, allLayouts) => {
             if (onLayoutChange) {
-              onLayoutChange(allLayouts);
+              onLayoutChange(allLayouts, currentBreakpointRef.current);
             }
           }}
         >
           {widgets.map((widget) => (
             // [구조 유지] Grid Item -> Wrapper -> Card 구조 유지
-            <div key={widget.id} className={expandedId === widget.id ? "grid-item-expanded" : ""}>
+            <div key={widget.id} className={expandedId === widget.id ? "grid-item-expanded" : ""} style={{ minHeight: '140px' }}>
               <div style={{ height: '100%', width: '100%' }}>
                 <WidgetCard
                   id={widget.id}

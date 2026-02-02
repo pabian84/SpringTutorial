@@ -74,7 +74,8 @@ export const setupAxiosInterceptors = () => {
 
       // 권한 없음 / 강제 로그아웃 (403)
       if (status === 403) {
-        // "내 기기 아님(A006)"은 로그아웃 시키면 안 됨 (그냥 에러 메시지만 띄움)
+        // "내 기기 아님(A006)"은 
+        // 로그아웃 시키면 안 됨 (그냥 에러 메시지만 띄움)
         if (errorCode === 'A006') {
             showToast("본인의 기기만 로그아웃 할 수 있습니다.", "error");
             return Promise.reject(error);
@@ -98,7 +99,6 @@ export const setupAxiosInterceptors = () => {
       // 만약 EntryPoint를 구현해서 "A003"을 준다면 명확히 구분 가능.
       // 현재는 코드가 없거나, "A002"(Invalid), "A003"(Expired)일 때 시도.
       if (status === 401 && !originalRequest._retry) {
-
         // 만약 "비밀번호 불일치(A001)" 같은 401이라면 리프레시 할 필요 없음 (로그인 창에서 난 에러니까)
         if (errorCode === 'A001') {
             return Promise.reject(error);
@@ -129,7 +129,7 @@ export const setupAxiosInterceptors = () => {
           // (쿠키는 withCredentials=true 덕분에 자동으로 같이 감)
           const data = await sessionApi.refreshToken();
           
-          if (data.status === 'ok') {
+          if (data && data.accessToken) {
             const newAccessToken = data.accessToken;
 
             // 1. 새 토큰 저장

@@ -1,6 +1,6 @@
-import { useRef, useState, useLayoutEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useUserLocation } from '../contexts/UserLocationContext'; // [변경] 전역 위치 사용
 import { useWeather } from '../hooks/useWeather';
 import { useWeatherFormatter } from '../hooks/useWeatherFormatter'; // [변경] 포매터 사용
@@ -20,7 +20,7 @@ function WeatherSkeleton() {
       style={{
         width: '100%', height: '100%', borderRadius: '24px',
         background: 'linear-gradient(135deg, #2b2b3b 0%, #1e1e2a 100%)',
-        padding: '24px', boxSizing: 'border-box', display: 'flex',
+        padding: '16px', boxSizing: 'border-box', display: 'flex',
         flexDirection: 'column', justifyContent: 'space-between',
         overflow: 'hidden', position: 'relative'
       }}
@@ -103,7 +103,7 @@ export default function WeatherWidget() {
         style={{
           width: '100%', height: '100%',
           position: 'relative', overflow: 'hidden',
-          borderRadius: '24px', color: 'white', padding: '24px',
+          borderRadius: '24px', color: 'white', padding: '26px 20px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
           cursor: weather ? 'pointer' : 'default', 
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
@@ -128,7 +128,7 @@ export default function WeatherWidget() {
               <WeatherIcon sky={weather.currentSky} isNight={isCurrentNight} size={80} />
             </div>
 
-            <div ref={containerRef} style={{ marginTop: '15px', zIndex: 10, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '15px', display: 'flex', justifyContent: 'space-between' }}>
+            <div ref={containerRef} style={{ marginTop: '10px', zIndex: 10, borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', minHeight: '60px' }}>
               <AnimatePresence>
                 {processedHourly.map((hour, idx) => (
                   <motion.div key={`${hour.time}-${idx}`} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '40px' }}>

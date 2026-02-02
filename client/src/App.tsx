@@ -1,16 +1,15 @@
 import { useEffect } from 'react';
+import { Toaster } from 'react-hot-toast';
 import { BrowserRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useConnection } from './hooks/useConnection';
 import CesiumDetail from './pages/CesiumDetail';
 import Dashboard from './pages/Dashboard';
-import DashboardBackup from './pages/Dashboard-backup';
+import DeviceManagement from './pages/DeviceManagement';
 import Login from './pages/Login';
 import ThreeJsDetail from './pages/ThreeJsDetail';
 import UserDetail from './pages/UserDetail';
 import WeatherDetail from './pages/WeatherDetail';
-import { Toaster } from 'react-hot-toast';
 import './styles/toast.css';
-import DeviceManagement from './pages/DeviceManagement';
 
 // [1] 'AppContent'라는 새 컴포넌트를 정의합니다. (이름은 제가 지은 겁니다)
 // 이 친구는 <BrowserRouter> 안에서 실행될 녀석이라 useConnection(주소감지)을 쓸 수 있습니다.
@@ -38,7 +37,6 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/Dashboard-backup" element={<DashboardBackup />} />
         <Route path="/user/:userId" element={<UserDetail />} />
         <Route path="/weather" element={<WeatherDetail />} />
         <Route path="/cesium" element={<CesiumDetail />} />

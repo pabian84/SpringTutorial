@@ -10,6 +10,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.demo.domain.user.dto.RefreshSessionRes;
 import com.example.demo.domain.user.dto.UserRes;
 import com.example.demo.domain.user.entity.Session;
 import com.example.demo.domain.user.mapper.SessionMapper;
@@ -36,7 +37,7 @@ public class SessionService {
      * 토큰 갱신 (Refresh)
      */
     @Transactional
-    public Map<String, Object> refresh(String refreshToken) {
+    public RefreshSessionRes refresh(String refreshToken) {
         log.warn("리프레시 토큰으로 액세스 토큰 재발급 시도: {}", refreshToken);
 
         // 1. 토큰 유효성 검사 (서명 위조 등)
@@ -63,13 +64,12 @@ public class SessionService {
         String userId = session.getUserId();
         String newAccessToken = jwtTokenProvider.createAccessToken(userId, session.getId());
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", "ok");
-        result.put("accessToken", newAccessToken);
-
+        RefreshSessionRes response = RefreshSessionRes.builder()
+                    .accessToken(newAccessToken)
+                    .build();
         log.info("새 액세스 토큰 발급 완료 for userId={}: {}", userId, newAccessToken);
         
-        return result;
+        return response;
     }
 
     /**

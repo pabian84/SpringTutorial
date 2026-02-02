@@ -7,9 +7,13 @@ export interface UserDTO {
   role: string;
 }
 
-export interface LoginResultDTO {
+export interface LoginResDTO {
   accessToken: string;
   user: UserDTO;
+}
+
+export interface RefreshSessionResDTO {
+  accessToken: string;
 }
 
 // 기기 세션 정보 (Backend: SessionController.getMySessions)

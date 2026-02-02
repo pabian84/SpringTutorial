@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DeviceSessionDTO, UserDTO } from '../types/dtos';
+import type { DeviceSessionDTO, RefreshSessionResDTO, UserDTO } from '../types/dtos';
 
 export const sessionApi = {
   // 내 기기 목록 조회
@@ -9,7 +9,7 @@ export const sessionApi = {
   },
 
   refreshToken: async () => {
-    const {data} = await axios.post('/api/sessions/refresh');
+    const {data} = await axios.post<RefreshSessionResDTO>('/api/sessions/refresh');
     return data;
   },
 
