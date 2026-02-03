@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { sessionApi } from '../api/sessionApi';
 import type { WebSocketMessage, WebSocketSendMessage } from '../types/dtos';
 import { WebSocketContext, isWebSocketMessage } from './WebSocketContext';
+import { useLocation } from 'react-router-dom';
+//import { showToast } from '../utils/Alert';
 
 export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -12,6 +14,9 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
+
+  // 현재 위치 감지 (로그인 페이지 -> 대시보드 이동 감지용)
+  const { pathname } = useLocation();
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const WS_URL = `${protocol}//${window.location.host}`; 
@@ -24,11 +29,19 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
     if (!token || !myId) {
       console.warn("[WebSocket] 토큰 또는 ID가 없어 연결하지 않습니다.");
+      //showToast('[WebSocket] 토큰 또는 ID가 없어 연결하지 않습니다.');
       return;
     }
 
-    // 기존 연결 정리
+    // 기존 연결 유지
     if (socketRef.current?.readyState === WebSocket.OPEN) {
+      //socketRef.current.close();
+      //showToast('기존 연결 유지');
+      return;
+    }
+
+    // 기존 연결 정리 (혹시 닫히고 있는 중이거나 에러 상태일 때)
+    if (socketRef.current) {
         socketRef.current.close();
     }
 
@@ -36,6 +49,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
     ws.onopen = () => {
       console.log(`✅ WebSocket Connected: ${myId}`);
+      //showToast(`✅ WebSocket Connected: ${myId}`);
       setIsConnected(true);
       // 연결 성공 시 재연결 타이머 제거
       if (reconnectTimerRef.current) {
@@ -52,6 +66,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
         }
       } catch (e) {
         console.error('Socket message parse error', e);
+        //showToast('Socket message parse error');
       }
     };
 
@@ -66,12 +81,14 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
         sessionApi.refreshToken()
           .then((res) => {
             console.log("✅ 토큰 갱신 성공, 재연결 대기...");
+            //showToast("✅ 토큰 갱신 성공, 재연결 대기...");
             if (res && res.accessToken) {
               localStorage.setItem('accessToken', res.accessToken);
             }
           })
           .catch((err) => {
             console.error("❌ 토큰 갱신 실패, 로그아웃 처리 예정", err);
+            //showToast("❌ 토큰 갱신 실패, 로그아웃 처리 예정");
             // axiosConfig 인터셉터가 로그아웃 처리하겠지만, 여기서도 안전하게 연결 중단
             return; 
           });
@@ -81,7 +98,8 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
       if (event.code !== 1000 && event.code !== 4001) {
         reconnectTimerRef.current = window.setTimeout(() => {
           console.log('🔄 Reconnecting...');
-          // [해결] 함수를 직접 호출하지 않고 상태를 변경해 useEffect를 트리거
+          //showToast('🔄 Reconnecting...');
+          // 함수를 직접 호출하지 않고 상태를 변경해 useEffect를 트리거
           setRetryCount(prev => prev + 1); 
         }, 3000);
       }
@@ -96,14 +114,8 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     
     // Cleanup Function
     return () => {
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-      if (reconnectTimerRef.current) {
-        window.clearTimeout(reconnectTimerRef.current);
-      }
     };
-  }, [connectSocket, retryCount]); // retryCount가 바뀌면 재연결
+  }, [connectSocket, retryCount, pathname]); // retryCount가 바뀌면 재연결
 
   // [기능 3] 수동 재연결 (외부 노출용)
   const forceReconnect = useCallback(() => {

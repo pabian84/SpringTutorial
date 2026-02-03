@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userApi } from '../api/userApi';
 import { showAlert, showToast } from '../utils/Alert';
@@ -11,6 +11,13 @@ export default function Login() {
   const [keepLogin, setKeepLogin] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    // 깔끔하게 비우고 시작해야 꼬이지 않습니다.
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('myId');
+  }, []);
+  
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); // form submit 시 페이지 새로고침 방지
     try {

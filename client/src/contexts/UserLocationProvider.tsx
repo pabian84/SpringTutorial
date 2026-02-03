@@ -36,7 +36,7 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
   const [location, setLocation] = useState<LocationState>(() => {
     // 로그인 페이지면 무조건 null 상태로 시작 (권한 체크도 안 함)
     if (pathname === '/') {
-        return { lat: null, lon: null, loading: false, error: null };
+      return { lat: null, lon: null, loading: false, error: null };
     }
     // GPS 미지원 체크
     if (!navigator.geolocation) {
@@ -55,12 +55,35 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
 
   // Ref 초기화 (중복 업데이트 방지용)
   const lastCoords = useRef<{ lat: number; lon: number } | null>(getCachedLocation());
-
   // 위치 감시 시작
   useEffect(() => {
-    // 로그인 페이지('/')거나 GPS 없으면 아예 로직 실행 안 함
-    if (pathname === '/' || !navigator.geolocation) return;
-    
+    const setloca = () => {
+      setLocation({ lat: null, lon: null, loading: false, error: 'GPS 미지원' });
+    };
+    // 1. 로그인 페이지면 중단
+    if (pathname === '/') {
+      return;
+    } 
+
+    // 2. [핵심 해결] 대시보드 진입 시 데이터가 없다면 로딩 상태 강제 적용
+    // setTimeout(..., 0)으로 감싸서 렌더링 충돌(Warning)을 원천 차단합니다.
+    if (!lastCoords.current) {
+      setTimeout(() => {
+          setLocation(prev => ({ ...prev, loading: true, error: null }));
+      }, 0);
+    } else {
+      // 이미 데이터가 있으면 로딩 해제 (혹시 모를 상태 동기화)
+      setTimeout(() => {
+          setLocation(prev => ({ ...prev, loading: false }));
+      }, 0);
+    }
+
+    // 3. 위치 추적 시작 로직
+    if (!navigator.geolocation) {
+      setloca();
+      return;
+    }
+
     let watchId: number | null = null;
 
     // 위치 추적 시작 함수
@@ -73,7 +96,7 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
           const newLon = pos.coords.longitude;
 
           // 1km 이내 이동 시 업데이트 스킵 (성능 최적화)
-          if (lastCoords.current) {
+          if (lastCoords.current && location.lat !== null && location.lon !== null) {
             const dist = getDistanceFromLatLonInKm(lastCoords.current.lat, lastCoords.current.lon, newLat, newLon);
             if (dist < 1.0) return; 
           }
@@ -137,9 +160,9 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
       })
       .catch((error) => {
         // [핵심] HTTP 환경 등에서 Permission API가 실패할 경우 여기로 진입
-          console.warn("⚠️ Permissions API 에러 (HTTP 환경일 가능성 높음), 강제 실행 시도:", error);
-          // API 확인이 실패해도 startWatching을 실행해야 watchPosition의 에러 콜백이라도 터져서 로딩이 끝남
-          startWatching();
+        console.warn("⚠️ Permissions API 에러 (HTTP 환경일 가능성 높음), 강제 실행 시도:", error);
+        // API 확인이 실패해도 startWatching을 실행해야 watchPosition의 에러 콜백이라도 터져서 로딩이 끝남
+        startWatching();
       });
     } else {
       // 구형 브라우저 등 Permissions API가 없는 경우 그냥 실행
@@ -151,7 +174,7 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
         navigator.geolocation.clearWatch(watchId);
       };
     };
-  }, [pathname]);
+  }, [pathname, location.lat, location.lon]);
 
   return (
     <UserLocationContext.Provider value={location}>
