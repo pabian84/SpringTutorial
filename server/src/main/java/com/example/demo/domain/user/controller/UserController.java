@@ -58,11 +58,13 @@ public class UserController {
                 maxAge = -1; // 세션 쿠키 (브라우저 끄면 삭제, 탭 닫으면 유지)
             }
 
-            // 쿠키 설정 (컨트롤러 역할)
+            // 쿠키 설정 (컨트롤러 역할) - SameSite=Lax (개발용 HTTP 호환)
+            // 참고: SameSite=None은 Secure=true가 필요하지만 HTTP 개발 환경에서는 동작하지 않을 수 있음
             ResponseCookie cookie = ResponseCookie.from("refreshToken", result.getRefreshToken())
                         .httpOnly(true)
                         .path("/")
                         .secure(false) // HTTPS 환경이면 true 권장
+                        .sameSite("Lax") // HTTP 개발 환경에서는 Lax 사용
                         .maxAge(maxAge) // 7일
                         .build();
             response.addHeader("Set-Cookie", cookie.toString());
@@ -106,8 +108,14 @@ public class UserController {
             sessionService.forceDisconnectOne(userId, sessionId);
         }
         
-        // 쿠키 삭제
-        ResponseCookie cookie = ResponseCookie.from("refreshToken", "").maxAge(0).path("/").build();
+        // 쿠키 삭제 (SameSite=Lax로 일관성 유지)
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
+                    .httpOnly(true)
+                    .path("/")
+                    .secure(false)
+                    .sameSite("Lax")
+                    .maxAge(0)
+                    .build();
         return ResponseEntity.ok().header("Set-Cookie", cookie.toString()).body("로그아웃 되었습니다.");
     }
 

@@ -38,7 +38,13 @@ public class SessionController {
         try {
             return ResponseEntity.ok(sessionService.refresh(refreshToken));
         } catch (Exception e) {
-            ResponseCookie cookie = ResponseCookie.from("refreshToken", "").maxAge(0).path("/").build();
+            ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
+                        .httpOnly(true)
+                        .path("/")
+                        .secure(false)
+                        .sameSite("Lax")
+                        .maxAge(0)
+                        .build();
             return ResponseEntity.status(401).header("Set-Cookie", cookie.toString()).body("토큰 만료");
         }
     }

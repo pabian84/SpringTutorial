@@ -14,16 +14,17 @@ import {
   FaUserShield
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { sessionApi } from '../api/sessionApi';
 import type { DeviceSessionDTO } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 
 export default function DeviceManagement() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [sessions, setSessions] = useState<DeviceSessionDTO[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // 데이터 로드
   const fetchSessions = async () => {
     try {
       setLoading(true);
@@ -41,7 +42,6 @@ export default function DeviceManagement() {
     fetchSessions();
   }, []);
 
-  // [기능] 특정 기기 로그아웃
   const handleLogoutOne = async (sessionId: number, isCurrent: boolean) => {
     const result = await showConfirm('로그아웃', '해당 기기의 접속을 해제하시겠습니까?');
     if (!result.isConfirmed) return;
@@ -49,15 +49,8 @@ export default function DeviceManagement() {
     try {
       await sessionApi.revokeSession(sessionId);
       if (isCurrent) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('myId');
-
-
-        // 약간의 딜레이 후 이동 (토스트 메시지 볼 시간 확보)
-        setTimeout(() => {
-            window.location.href = '/'; 
-        }, 500);
-        
+        // 중앙화된 logout 사용
+        logout('기기 로그아웃');
       } else {
         setSessions((prev) => prev.filter((s) => s.id !== sessionId));
       }
@@ -68,7 +61,6 @@ export default function DeviceManagement() {
     }
   };
 
-  // [기능] 다른 기기 모두 로그아웃
   const handleLogoutOthers = async () => {
     const result = await showConfirm('다른 기기 해제', '현재 기기를 제외한 모든 기기를 로그아웃 하시겠습니까?');
     if (!result.isConfirmed) return;
@@ -83,23 +75,20 @@ export default function DeviceManagement() {
     }
   };
 
-  // [기능] 전체 로그아웃
   const handleLogoutAll = async () => {
     const result = await showConfirm('전체 로그아웃', '모든 기기에서 로그아웃 하시겠습니까?');
     if (!result.isConfirmed) return;
 
     try {
       await sessionApi.revokeAll();
-      localStorage.clear();
-      showToast('전체 로그아웃 되었습니다.', 'success');
-      navigate('/'); 
+      // 중앙화된 logout 사용
+      logout('전체 로그아웃');
     } catch (e) {
       console.error(e);
       showToast('요청 실패', 'error');
     }
   };
 
-  // 아이콘 헬퍼
   const getIcon = (type: string) => {
     const t = type ? type.toLowerCase() : 'desktop';
     if (t.includes('mobile')) return <FaMobileAlt size={28} />;
@@ -107,7 +96,6 @@ export default function DeviceManagement() {
     return <FaDesktop size={28} />;
   };
 
-  // 시간 포맷
   const formatTime = (dateString: string) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
@@ -119,9 +107,6 @@ export default function DeviceManagement() {
     return date.toLocaleDateString();
   };
 
-  // --------------------------------------------------------------------------
-  // [스타일 정의]
-  // --------------------------------------------------------------------------
   const styles = {
     container: {
       padding: '20px',
@@ -133,7 +118,6 @@ export default function DeviceManagement() {
       backgroundColor: '#16213e',
     },
     
-    // 헤더
     header: {
       display: 'flex',
       alignItems: 'center',
@@ -167,7 +151,6 @@ export default function DeviceManagement() {
       lineHeight: '1',
     },
     
-    // [수정] 안내 카드 레이아웃
     infoCard: {
       background: 'linear-gradient(90deg, #1f2937 0%, #253043 100%)',
       padding: '25px',
@@ -180,9 +163,8 @@ export default function DeviceManagement() {
       flexWrap: 'wrap' as const,
       gap: '20px',
     },
-    // [수정] 텍스트 영역: Flex 2 (버튼보다 2배 넓게)
     infoText: {
-      flex: '2 1 400px', // Grow: 2, Basis: 400px (넓을 땐 2배, 좁으면 줄바꿈)
+      flex: '2 1 400px',
       minWidth: '280px',
     },
     infoTitle: {
@@ -192,18 +174,16 @@ export default function DeviceManagement() {
       color: '#fff',
     },
 
-    // [수정] 버튼 그룹: Flex 1 (텍스트의 절반 크기)
     buttonGroup: {
       display: 'flex',
       gap: '12px',
       flexWrap: 'wrap' as const,
-      flex: '1 1 300px', // Grow: 1, Basis: 300px
+      flex: '1 1 300px',
       justifyContent: 'flex-end',
     },
     
-    // 버튼 스타일 (50:50 적용)
     actionButton: {
-      flex: '1 1 0px', 
+      flex: '1 1 0px',
       minWidth: '200px',
       padding: '12px 20px',
       borderRadius: '8px',
@@ -218,14 +198,12 @@ export default function DeviceManagement() {
       transition: 'all 0.2s',
     },
 
-    // 그리드
     grid: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
       gap: '25px',
     },
 
-    // 카드 스타일
     card: {
       background: '#1f2937',
       borderRadius: '16px',
@@ -268,20 +246,18 @@ export default function DeviceManagement() {
       padding: '20px',
       flex: 1,
     },
-    // [수정] 기기 이름 (2줄 말줄임 처리)
     deviceName: {
       fontSize: '18px',
       fontWeight: 'bold',
       color: '#fff',
       marginBottom: '15px',
-      // Webkit Line Clamp 적용
       display: '-webkit-box',
       WebkitLineClamp: 2,
       WebkitBoxOrient: 'vertical' as const,
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       lineHeight: '1.4',
-      minHeight: '2.8em', // 2줄 높이 확보로 카드 높이 통일
+      minHeight: '2.8em',
     },
     infoRow: {
       display: 'flex',
@@ -332,7 +308,6 @@ export default function DeviceManagement() {
 
   return (
     <div style={styles.container}>
-      {/* 헤더 */}
       <header style={styles.header}>
         <button 
           onClick={() => navigate(-1)} 
@@ -350,7 +325,6 @@ export default function DeviceManagement() {
         </h1>
       </header>
 
-      {/* 안내 카드 */}
       <div style={styles.infoCard}>
         <div style={styles.infoText}>
           <div style={styles.infoTitle}>접속 기기 현황</div>
@@ -359,9 +333,7 @@ export default function DeviceManagement() {
           </p>
         </div>
         
-        {/* 버튼 그룹 */}
         <div style={styles.buttonGroup}>
-          {/* 현재 기기 외 모두 로그아웃 */}
           <button 
             onClick={handleLogoutOthers} 
             style={{
@@ -377,7 +349,6 @@ export default function DeviceManagement() {
             현재 기기 외 모두 로그아웃
           </button>
 
-          {/* 전체 로그아웃 */}
           <button 
             onClick={handleLogoutAll} 
             style={{
@@ -395,7 +366,6 @@ export default function DeviceManagement() {
         </div>
       </div>
 
-      {/* 기기 리스트 그리드 */}
       <div style={styles.grid}>
         {loading ? (
           <div style={{ ...styles.emptyState, border: 'none' }}>
@@ -426,7 +396,6 @@ export default function DeviceManagement() {
                 </div>
 
                 <div style={styles.cardBody}>
-                  {/* 기기 이름 (userAgent) */}
                   <h3 style={styles.deviceName} title={session.userAgent}>
                     {session.userAgent}
                   </h3>

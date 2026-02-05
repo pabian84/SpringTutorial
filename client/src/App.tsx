@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthProvider';
+import { useAuth } from './contexts/AuthContext';
 import { useWebSocket } from './contexts/WebSocketContext';
+import { useEffect, useRef } from 'react';
 import CesiumDetail from './pages/CesiumDetail';
 import Dashboard from './pages/Dashboard';
 import DeviceManagement from './pages/DeviceManagement';
@@ -11,48 +13,57 @@ import UserDetail from './pages/UserDetail';
 import WeatherDetail from './pages/WeatherDetail';
 import './styles/toast.css';
 
-// [1] 'AppContent'라는 새 컴포넌트를 정의합니다. (이름은 제가 지은 겁니다)
-// 이 친구는 <BrowserRouter> 안에서 실행될 녀석이라 useConnection(주소감지)을 쓸 수 있습니다.
-function AppContent() {
-  // 앱 시작 시 토큰이 있으면 대시보드로 납치하는 로직
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // 훅에서 lastMessage를 꺼냅니다.
+// 전역 소켓 이벤트 감지 컴포넌트
+function SocketEventHandler() {
   const { lastMessage } = useWebSocket();
-
-  // 전역 소켓 이벤트 감지 (모든 페이지 공통)
-  useEffect(() => {
-    if (lastMessage?.type === 'FORCE_LOGOUT') {
-      console.warn("강제 로그아웃 감지!");
-      // 토스트 메시지 등 처리
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('myId');
-      navigate('/');
-    }
-  }, [lastMessage, navigate]);
+  const { logout } = useAuth();
+  const hasLoggedRef = useRef(false);
 
   useEffect(() => {
-    // 1. 저장소에서 토큰 확인 (로그인 유지 체크했으면 local, 아니면 session에 있음)
-    const token = localStorage.getItem('accessToken');
-    
-    // 2. 토큰이 있고, 현재 페이지가 로그인 페이지('/')라면 -> 대시보드로 이동
-    if (token && location.pathname === '/') {
-      navigate('/dashboard');
+    if (lastMessage?.type === 'FORCE_LOGOUT' && !hasLoggedRef.current) {
+      hasLoggedRef.current = true;
+      logout('강제 로그아웃'); // 비동기 logout
     }
-    // (선택사항) 반대로 토큰이 없는데 대시보드 접근하려 하면 쫓아내는 로직도 여기에 추가 가능
-  }, [navigate, location.pathname]);
+  }, [lastMessage, logout]);
 
+  return null;
+}
+
+// Protected Route - Outlet 패턴 사용
+function ProtectedRoute() {
+  // 토큰이 없으면 로그인 페이지로
+  if (!localStorage.getItem('accessToken')) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Outlet />;
+}
+
+// Public Route - 로그인 되어 있으면 대시보드로
+function PublicRoute() {
+  if (localStorage.getItem('accessToken')) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Login />;
+}
+
+function AppContent() {
   return (
     <>
+      <SocketEventHandler />
       <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/" element={<PublicRoute />} />
+        <Route path="/dashboard" element={<ProtectedRoute />}>
+          <Route index element={<Dashboard />} />
+        </Route>
         <Route path="/user/:userId" element={<UserDetail />} />
         <Route path="/weather" element={<WeatherDetail />} />
         <Route path="/cesium" element={<CesiumDetail />} />
         <Route path="/threejs" element={<ThreeJsDetail />} />
-        <Route path="/devices" element={<DeviceManagement />} />
+        <Route path="/devices" element={<ProtectedRoute />}>
+          <Route index element={<DeviceManagement />} />
+        </Route>
       </Routes>
       <Toaster
         position='top-right'
@@ -69,13 +80,12 @@ function AppContent() {
   );
 }
 
-// [2] 기존 App 컴포넌트는 '껍데기' 역할만 합니다.
 function App() {
   return (
-    <>
-      {/* 여기서 방금 만든 AppContent를 불러옵니다 */}
+    <AuthProvider>
       <AppContent />
-    </>
+    </AuthProvider>
   );
 }
-export default App
+
+export default App;

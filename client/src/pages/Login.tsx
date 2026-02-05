@@ -3,37 +3,34 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userApi } from '../api/userApi';
 import { showAlert, showToast } from '../utils/Alert';
+import { setToken, getTokenExpirySeconds } from '../utils/authUtility';
 
 export default function Login() {
   const [id, setId] = useState('admin');
   const [password, setPassword] = useState('1234');
-  // 로그인 유지 체크박스 상태
   const [keepLogin, setKeepLogin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 깔끔하게 비우고 시작해야 꼬이지 않습니다.
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('myId');
-  }, []);
-  
+    if (localStorage.getItem('accessToken')) {
+      navigate('/dashboard');
+    }
+  }, [navigate]);
+
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault(); // form submit 시 페이지 새로고침 방지
+    e.preventDefault();
     try {
-      // axios 직접 호출 제거
       const data = await userApi.login(id, password, keepLogin);
       const { user, accessToken } = data;
 
-      // 토큰과 유저 정보가 있으면 성공 처리
       if (accessToken && user) {
-        localStorage.setItem('accessToken', accessToken);
+        // authUtility를 통해 토큰 설정 (application.yml과 동기화)
+        setToken(accessToken, getTokenExpirySeconds());
         localStorage.setItem('myId', user.id);
         
         showToast(`환영합니다, ${user.name}님!`, 'success');
         navigate('/dashboard');
       } else {
-        // 혹시라도 데이터가 비어있다면 에러 처리
         throw new Error("로그인 응답 데이터 오류");
       }
     } catch (e) {
@@ -41,7 +38,6 @@ export default function Login() {
       let errorMessage = '로그인 중 오류가 발생했습니다.';
 
       if (axios.isAxiosError(e)) {
-        // 서버가 보낸 에러 메시지가 있다면 사용 (e.response.data가 string이라고 가정)
         if (e.response?.data && typeof e.response.data === 'string') {
           errorMessage = e.response.data;
         } else if (e.response?.status === 401) {
@@ -55,13 +51,12 @@ export default function Login() {
     }
   };
 
-  // 스타일 객체 (이 파일에서만 쓸 배치용 스타일)
   const styles = {
     container: {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      height: '100vh', // 화면 전체 높이
+      height: '100vh',
       backgroundColor: 'var(--bg-color)',
     },
     card: {
@@ -69,7 +64,7 @@ export default function Login() {
       padding: '40px',
       borderRadius: '16px',
       backgroundColor: 'var(--card-color)',
-      boxShadow: '0 10px 25px rgba(0,0,0,0.5)', // 그림자 효과
+      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
       textAlign: 'center' as const,
     },
     title: {

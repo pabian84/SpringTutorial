@@ -20,12 +20,8 @@ export const useDashboardData = () => {
   const [chatMessages, setChatMessages] = useState<ChatHistoryDTO[]>([]);
   const [serverData, setServerData] = useState<SystemStatusDTO[]>([]);
   
-  // 1. 유저 인증 체크
-  useEffect(() => {
-    if (!myId) {
-      navigate('/');
-    }
-  }, [myId, navigate]);
+  // 주의: ProtectedRoute에서 이미 인증을 체크하므로 여기서는 중복 체크하지 않음
+  // myId가 없으면 API 호출이 enabled=false로 막히므로 안전함
 
   // 2. 접속자 리스트 (React Query)
   const { data: onlineUsers = [] } = useQuery({

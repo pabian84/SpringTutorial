@@ -45,7 +45,13 @@ public class JwtTokenProvider {
         if (userId == null) {
             throw new IllegalArgumentException("User ID cannot be null for Access Token");
         }
-        return createToken(userId, null, jwtProperties.getRefreshTokenValidityInSeconds());
+        
+        // 디버깅: Refresh Token 유효기간 확인
+        long refreshValidity = jwtProperties.getRefreshTokenValidityInSeconds();
+        log.info("Refresh Token 생성 - 유효기간(초): {}, 설정값(7일=604800초과 일치?: {}", 
+                refreshValidity, refreshValidity == 604800);
+        
+        return createToken(userId, null, refreshValidity);
     }
 
     // 2. Access Token 생성 (세션 바인딩)
