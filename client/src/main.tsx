@@ -1,10 +1,11 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'; // React Query 관련 임포트
-import "cesium/Build/Cesium/Widgets/widgets.css"; // 세슘 스타일은 여기서 로드합니다.
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import "cesium/Build/Cesium/Widgets/widgets.css";
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import 'react-grid-layout/css/styles.css'; // 리액트 그리드 레이아웃 필수 CSS
-import 'react-resizable/css/styles.css'; // 리액트 리사이저블 CSS
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 import { BrowserRouter } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import App from './App.tsx';
 import { CesiumCameraProvider } from './contexts/CesiumCameraProvider';
 import { UserLocationProvider } from './contexts/UserLocationProvider';
@@ -12,15 +13,28 @@ import { WebSocketProvider } from './contexts/WebSocketProvider';
 import './index.css';
 import { setupAxiosInterceptors } from './utils/axiosConfig';
 
-// [추가] 앱 시작 시 Axios 인터셉터 설정 적용 (토큰 자동 첨부)
+// 앱 시작 시 Axios 인터셉터 설정 적용
 setupAxiosInterceptors();
 
-// [추가] 클라이언트 인스턴스 생성
+// 클라이언트 인스턴스 생성
 const queryClient = new QueryClient()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      {/* Toaster를 Router 외부에 배치하여 페이지 이동 시에도 토스트 유지 */}
+      <Toaster
+        position='top-right'
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#333',
+            color: '#fff',
+            fontSize: '18px',
+            padding: '16px 20px',
+          },
+        }}
+      />
       <BrowserRouter>
         <UserLocationProvider>
           <CesiumCameraProvider>

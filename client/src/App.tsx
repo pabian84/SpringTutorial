@@ -1,5 +1,4 @@
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthProvider';
 import { useAuth } from './contexts/AuthContext';
 import { useWebSocket } from './contexts/WebSocketContext';
@@ -22,7 +21,7 @@ function SocketEventHandler() {
   useEffect(() => {
     if (lastMessage?.type === 'FORCE_LOGOUT' && !hasLoggedRef.current) {
       hasLoggedRef.current = true;
-      logout('강제 로그아웃'); // 비동기 logout
+      logout('강제 로그아웃');
     }
   }, [lastMessage, logout]);
 
@@ -65,17 +64,6 @@ function AppContent() {
           <Route index element={<DeviceManagement />} />
         </Route>
       </Routes>
-      <Toaster
-        position='top-right'
-        toastOptions={{
-          style: {
-            background: '#333',
-            color: '#fff',
-            fontSize: '18px',
-            padding: '16px 20px',
-          },
-        }}
-      />
     </>
   );
 }

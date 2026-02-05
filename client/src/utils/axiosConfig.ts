@@ -27,8 +27,7 @@ export const setupAxiosInterceptors = () => {
         return config;
       }
       
-      // 토큰이 만료 임박했으면 (이미 갱신 중이 아니면) 갱신 시도
-      // 단, 갱신 중이면 대기열에 등록만 하고 토큰 없이 진행
+      // 토큰 갱신이 필요한 경우
       if (shouldRefreshToken() && !isRefreshing()) {
         try {
           const newToken = await refreshToken();
@@ -42,13 +41,18 @@ export const setupAxiosInterceptors = () => {
           // 갱신 실패해도 요청은 진행 (응답 인터셉터에서 401 처리)
         }
       } else if (isRefreshing()) {
-        // 갱신 중이면 대기열에 등록
-        addRefreshSubscriber((token: string) => {
-          if (!config.headers) {
-            config.headers = new AxiosHeaders();
+        // 갱신 중이면 새 토큰이 나올 때까지 대기 (블로킹)
+        try {
+          const newToken = await refreshToken();
+          if (newToken) {
+            if (!config.headers) {
+              config.headers = new AxiosHeaders();
+            }
+            config.headers.set('Authorization', `Bearer ${newToken}`);
           }
-          config.headers.set('Authorization', `Bearer ${token}`);
-        });
+        } catch {
+          // 갱신 실패해도 요청은 진행
+        }
       } else if (token) {
         // 토큰이 유효하면 헤더에 추가
         if (!config.headers) {
@@ -90,7 +94,22 @@ export const setupAxiosInterceptors = () => {
       }
 
       // 403 접근 거부
+      // 토큰 갱신 중에는 403에서도 로그아웃하지 않음
       if (status === 403) {
+        if (isRefreshing()) {
+          // 갱신 중이면 새 토큰으로 재시도
+          return new Promise((resolve) => {
+            addRefreshSubscriber((token: string) => {
+              if (originalRequest.headers instanceof AxiosHeaders) {
+                originalRequest.headers.set('Authorization', `Bearer ${token}`);
+              } else {
+                originalRequest.headers['Authorization'] = `Bearer ${token}`;
+              }
+              resolve(axios(originalRequest));
+            });
+          });
+        }
+        
         if (errorCode === 'A006') {
           showToast("본인의 기기만 로그아웃 할 수 있습니다.", "error");
         } else {
@@ -135,7 +154,6 @@ export const setupAxiosInterceptors = () => {
             }
             return axios(originalRequest);
           }
-          // 갱신 실패
           logout();
           return Promise.reject(error);
         } catch {
@@ -148,5 +166,3 @@ export const setupAxiosInterceptors = () => {
     }
   );
 };
-
-

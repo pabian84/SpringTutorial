@@ -1,5 +1,6 @@
 // 인증 관련 유틸리티 (React 외부에서 사용 가능)
 import { sessionApi } from '../api/sessionApi';
+import { showToast } from './Alert';
 
 const TOKEN_EXPIRY_KEY = 'accessTokenExpiresAt';
 const TOKEN_REFRESHING_KEY = 'isRefreshing';
@@ -148,7 +149,7 @@ export const refreshToken = async (): Promise<string | null> => {
     setRefreshing(false);
     refreshSubscribers = [];
     return null;
-  } catch (error) {
+  } catch {
     refreshSubscribers = [];
     setRefreshing(false);
     return null;
@@ -164,6 +165,15 @@ const deleteRefreshTokenCookie = (): void => {
 
 // 로그아웃
 export const logout = async (reason?: string): Promise<void> => {
+  // 토스트를 먼저 보여주고 대기 (토스트가 사라지지 않도록)
+  if (reason) {
+    showToast(reason, 'error');
+  }
+  
+  // 토스트가 보여줄 시간을 확보 (1초)
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  // 이제 로컬 스토리지 정리
   localStorage.removeItem('accessToken');
   localStorage.removeItem('myId');
   localStorage.removeItem(TOKEN_EXPIRY_KEY);
@@ -181,7 +191,7 @@ export const logout = async (reason?: string): Promise<void> => {
   // 쿠키 삭제
   deleteRefreshTokenCookie();
   
-  // 로그인 페이지가 아니면 리다이렉트
+  // 로그인 페이지가 아니면 리다이렉트 (ProtectedRoute가 처리)
   if (window.location.pathname !== '/') {
     window.location.href = '/';
   }
