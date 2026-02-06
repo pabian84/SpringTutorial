@@ -18,22 +18,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   const WS_URL = `${protocol}//${window.location.host}`;
 
   const connectSocket = useCallback(() => {
-    // 로그인 페이지에서는 연결하지 않음
-    if (window.location.pathname === '/') {
-      return;
-    }
-    
-    // 이미 연결 중이면 건너뜀
-    if (isConnectingRef.current) {
-      return;
-    }
-
-    // 이미 연결되어 있으면 건너뜀
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      setIsConnected(true);
-      return;
-    }
-
+    // 토큰이 없으면 연결하지 않음 (pathname 체크 제거 - Dashboard mounting 시 연결 허용)
     const token = localStorage.getItem('accessToken');
     let myId = localStorage.getItem('myId');
 
@@ -46,6 +31,17 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     }
 
     if (!token || !myId) {
+      return;
+    }
+
+    // 이미 연결 중이면 건너뜀
+    if (isConnectingRef.current) {
+      return;
+    }
+
+    // 이미 연결되어 있으면 건너뜀
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      setIsConnected(true);
       return;
     }
 
@@ -129,8 +125,25 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
       }
     };
     
+    // 로그아웃 이벤트 감지 (WebSocket 정리)
+    const handleLogout = () => {
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+        setIsConnected(false);
+      }
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    };
+    
     window.addEventListener('tokenChange', handleTokenChange);
-    return () => window.removeEventListener('tokenChange', handleTokenChange);
+    window.addEventListener('authLogout', handleLogout);
+    return () => {
+      window.removeEventListener('tokenChange', handleTokenChange);
+      window.removeEventListener('authLogout', handleLogout);
+    };
   }, [connectSocket]);
 
   // 초기 연결 시도

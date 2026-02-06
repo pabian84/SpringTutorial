@@ -2,11 +2,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sessionApi } from '../api/sessionApi';
-import { userApi } from '../api/userApi';
 import { chatApi, financeApi, memoApi, statsApi } from '../api/widgetApi';
-import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusDTO } from '../types/dtos';
+import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusDTO, SystemStatusMessage } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 import { useWebSocket } from '../contexts/WebSocketContext';
+import { logout } from '../utils/authUtility';
 
 export const useDashboardData = () => {
   const navigate = useNavigate();
@@ -123,18 +123,29 @@ export const useDashboardData = () => {
 
     // Discriminated Union 덕분에 switch-case에서 타입 추론 완벽 지원
     switch (lastMessage.type) {
-      case 'SYSTEM_STATUS':
+      case 'SYSTEM_STATUS': {
         // 여기서 lastMessage는 자동으로 SystemStatusMessage 타입이 됨
-        setServerData((prev) => {
-          const updated = [...prev, lastMessage];
-          return updated.length > 20 ? updated.slice(updated.length - 20) : updated;
-        });
+        const statusMessage = lastMessage as SystemStatusMessage;
+        const init = (msg : SystemStatusMessage) => {
+            setServerData((prev) => {
+            const updated = [...prev, msg];
+            return updated.length > 20 ? updated.slice(updated.length - 20) : updated;
+          });
+        };
+        // WebSocket 메시지 수신 시 상태 업데이트 (의도된 동작)
+        init(statusMessage);
         break;
+      }
 
-      case 'CHAT':
+      case 'CHAT': {
         // 여기서 lastMessage는 자동으로 ChatMessage 타입이 됨
-        setChatMessages((prev) => [...prev, lastMessage]);
+        const chatMessage = lastMessage as ChatMessage
+        const init2 = (msg : ChatMessage) => {
+            setChatMessages((prev) => [...prev, msg]);
+        };
+        init2(chatMessage);
         break;
+      }
 
       case 'USER_UPDATE':
         // 여기서 lastMessage는 UserUpdateMessage
@@ -162,19 +173,9 @@ export const useDashboardData = () => {
     }
   }, [myId, sendMessage]);
 
-  // 로그아웃
+  // === [로그아웃 - 중앙화된 authUtility 사용] ===
   const handleLogout = async () => {
-    try {
-      await userApi.logout();
-    } catch (e) {
-      console.error('Logout failed', e);
-      showToast('Logout failed', 'error');
-    } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('myId');
-      showToast('로그아웃 되었습니다');
-      //navigate('/');
-    }
+    await logout('사용자 로그아웃');
   };
 
   return {

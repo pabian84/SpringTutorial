@@ -94,10 +94,9 @@ export const setupAxiosInterceptors = () => {
       }
 
       // 403 접근 거부
-      // 토큰 갱신 중에는 403에서도 로그아웃하지 않음
       if (status === 403) {
+        // 이미 logout 중이면 중복 호출 방지
         if (isRefreshing()) {
-          // 갱신 중이면 새 토큰으로 재시도
           return new Promise((resolve) => {
             addRefreshSubscriber((token: string) => {
               if (originalRequest.headers instanceof AxiosHeaders) {
@@ -108,6 +107,13 @@ export const setupAxiosInterceptors = () => {
               resolve(axios(originalRequest));
             });
           });
+        }
+        
+        // 토큰이 이미 정리되었으면 중복 로그아웃 방지
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+          // 이미 로그아웃 상태
+          return Promise.reject(error);
         }
         
         if (errorCode === 'A006') {

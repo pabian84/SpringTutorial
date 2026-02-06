@@ -2,9 +2,20 @@
 import { sessionApi } from '../api/sessionApi';
 import { showToast } from './Alert';
 
+// 토큰 변경/로그아웃 이벤트 리스너 (WebSocket 재연결 및 페이지 이동용)
+const LOGOUT_EVENT = 'authLogout';
+
+// 로그아웃 이벤트 발생 (WebSocket 정리용)
+export const emitLogoutEvent = (): void => {
+  window.dispatchEvent(new CustomEvent(LOGOUT_EVENT));
+};
+
 const TOKEN_EXPIRY_KEY = 'accessTokenExpiresAt';
 const TOKEN_REFRESHING_KEY = 'isRefreshing';
 const TOKEN_CHANGE_EVENT = 'tokenChange';
+
+// 로그아웃 중복 호출 방지
+let isLoggingOut = false;
 
 // ============================================
 // ⚙️ 토큰 설정 (테스트용으로 여기서 수정)
@@ -165,36 +176,45 @@ const deleteRefreshTokenCookie = (): void => {
 
 // 로그아웃
 export const logout = async (reason?: string): Promise<void> => {
-  // 토스트를 먼저 보여주고 대기 (토스트가 사라지지 않도록)
+  // 이미 로그아웃 중이면 중복 호출 방지
+  if (isLoggingOut) {
+    return;
+  }
+  isLoggingOut = true;
+  
+  // 토스트 표시 (있는 경우)
   if (reason) {
     showToast(reason, 'error');
   }
   
-  // 토스트가 보여줄 시간을 확보 (1초)
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  // 토스트가 보여줄 시간을 확보 (1초) - 사용자에게 메시지を見せる 시간
+  //await new Promise(resolve => setTimeout(resolve, 1000));
   
-  // 이제 로컬 스토리지 정리
+  // 모든 정리 작업을 먼저 수행
+  // 1. 로컬 스토리지 정리
   localStorage.removeItem('accessToken');
   localStorage.removeItem('myId');
   localStorage.removeItem(TOKEN_EXPIRY_KEY);
   localStorage.removeItem(TOKEN_REFRESHING_KEY);
   
+  // 2. 대기열 정리
   refreshSubscribers = [];
   
-  // 서버 로그아웃 API 호출 (쿠키 삭제를 위해)
-  try {
-    await sessionApi.logout();
-  } catch {
-    // 서버 로그아웃 실패해도 클라이언트 측 로그아웃은 수행
-  }
-  
-  // 쿠키 삭제
+  // 3. 쿠키 삭제
   deleteRefreshTokenCookie();
   
-  // 로그인 페이지가 아니면 리다이렉트 (ProtectedRoute가 처리)
-  if (window.location.pathname !== '/') {
-    window.location.href = '/';
+  // 4. 로그아웃 이벤트 발생 (WebSocket 정리 + 페이지 이동)
+  emitLogoutEvent();
+  
+  // 5. 서버 로그아웃 API 호출 (선택적 - 실패해도 무시)
+  try {
+    await sessionApi.logout();
+  } catch (e) {
+    // 서버 로그아웃 실패해도 클라이언트 측 로그아웃은 이미 완료
+    console.error(e);
   }
+  
+  isLoggingOut = false;
 };
 
 // 새 토큰 가져오기 (갱신 필요시 갱신)

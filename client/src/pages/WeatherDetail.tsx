@@ -14,6 +14,7 @@ import { useUserLocation } from '../contexts/UserLocationContext';
 import { useWeather } from '../hooks/useWeather';
 import { useWeatherFormatter } from '../hooks/useWeatherFormatter';
 import type { WeatherDTO } from '../types/dtos';
+import type { IconType } from 'react-icons/lib';
 
 // --- 인터페이스 정의 ---
 interface DetailBoxProps {
@@ -32,7 +33,7 @@ type WeatherType = 'sun' | 'moon' | 'cloud' | 'rain' | 'snow' | 'fog' | 'storm' 
 // 분석 결과 인터페이스
 interface WeatherAsset {
   type: WeatherType;
-  Icon: React.ElementType;
+  Icon: IconType;
   color?: string;
 }
 

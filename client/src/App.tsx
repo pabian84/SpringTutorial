@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthProvider';
 import { useAuth } from './contexts/AuthContext';
 import { useWebSocket } from './contexts/WebSocketContext';
@@ -11,6 +11,23 @@ import ThreeJsDetail from './pages/ThreeJsDetail';
 import UserDetail from './pages/UserDetail';
 import WeatherDetail from './pages/WeatherDetail';
 import './styles/toast.css';
+
+// 전역 로그아웃 이벤트 감지 및 네비게이션 처리
+function GlobalLogoutHandler() {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    const handleLogout = () => {
+      // 즉시 로그인 페이지로 이동
+      navigate('/', { replace: true });
+    };
+    
+    window.addEventListener('authLogout', handleLogout);
+    return () => window.removeEventListener('authLogout', handleLogout);
+  }, [navigate]);
+  
+  return null;
+}
 
 // 전역 소켓 이벤트 감지 컴포넌트
 function SocketEventHandler() {
@@ -50,6 +67,7 @@ function PublicRoute() {
 function AppContent() {
   return (
     <>
+      <GlobalLogoutHandler />
       <SocketEventHandler />
       <Routes>
         <Route path="/" element={<PublicRoute />} />

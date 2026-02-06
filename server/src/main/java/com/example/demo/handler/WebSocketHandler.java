@@ -121,15 +121,17 @@ public class WebSocketHandler extends TextWebSocketHandler {
     }
 
     public void broadcastToTarget(WebSocketSession session, TextMessage message) {
-        if (!session.isOpen()) {
-            return;
-        }
-        // [핵심 해결] 해당 세션에 대한 쓰기 작업을 동기화(Lock)합니다.
-        // 스케줄러와 유저 접속 핸들러가 동시에 메시지를 보내려 해도,
-        // 여기서 줄을 서서 순서대로 보내게 되므로 충돌이 발생하지 않습니다.
+        // [수정] 세션 상태 체크를 synchronized 블록 내부로 이동 (레이스 컨디션 방지)
         synchronized (session) {
+            // 세션이 열려있는지 확인 (동기화 블록 내에서 다시 확인)
+            if (!session.isOpen()) {
+                return;
+            }
             try {
                 session.sendMessage(message);
+            } catch (IllegalStateException e) {
+                // 세션이 전송 중에关闭된 경우 - 정상적인 상황으로 간주
+                log.debug("메시지 전송 중 세션关闭 (정상): {}", session.getId());
             } catch (IOException e) {
                 log.debug("메시지 전송 실패 (클라이언트 연결 종료됨): {}", session.getId());
             }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   isTokenValid,
   refreshToken as utilityRefreshToken,
@@ -11,6 +11,10 @@ import {
 import { AuthContext } from './AuthContext';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // AuthProvider가 마운트되면 준비 완료 (logout은 GlobalLogoutHandler가 처리)
+  useEffect(() => {
+    console.log('[AuthProvider] 마운트 완료');
+  }, []);
   const [accessToken, setAccessToken] = useState<string | null>(() => {
     return localStorage.getItem('accessToken');
   });

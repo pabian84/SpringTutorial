@@ -1,4 +1,5 @@
 import { IoMoon, IoSunny } from 'react-icons/io5';
+import type { IconType } from 'react-icons/lib';
 import { 
   WiCloudy, WiRain, WiSnow, WiDayCloudy, WiFog, 
   WiNightAltCloudy, WiNightAltRain, WiNightAltSnow, WiNightAltShowers, WiNightAltThunderstorm,
@@ -10,7 +11,7 @@ export type WeatherType = 'sun' | 'moon' | 'cloud' | 'rain' | 'snow' | 'fog' | '
 
 export interface WeatherAsset {
   type: WeatherType;
-  Icon: React.ElementType;
+  Icon: IconType;
   color?: string;
 }
 

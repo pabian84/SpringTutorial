@@ -4,12 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { userApi } from '../api/userApi';
 import { showAlert, showToast } from '../utils/Alert';
 import { setToken, getTokenExpirySeconds } from '../utils/authUtility';
+import { useWebSocket } from '../contexts/WebSocketContext';
 
 export default function Login() {
   const [id, setId] = useState('admin');
   const [password, setPassword] = useState('1234');
   const [keepLogin, setKeepLogin] = useState(false);
   const navigate = useNavigate();
+  const { forceReconnect } = useWebSocket();
 
   useEffect(() => {
     if (localStorage.getItem('accessToken')) {
@@ -29,7 +31,14 @@ export default function Login() {
         localStorage.setItem('myId', user.id);
         
         showToast(`환영합니다, ${user.name}님!`, 'success');
-        navigate('/dashboard');
+        
+        // WebSocket 강제 재연결 (토큰 변경 후)
+        forceReconnect();
+        
+        // Dashboard 마운트 완료 후 네비게이트 (WebSocket 리스너 설정 대기)
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true });
+        }, 100);
       } else {
         throw new Error("로그인 응답 데이터 오류");
       }
