@@ -1,13 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   isTokenValid,
-  refreshToken as utilityRefreshToken,
+  getAccessToken as utilityGetAccessToken,
   setToken as utilitySetToken,
   logout as utilityLogout,
-  isRefreshing,
-  addRefreshSubscriber,
   getTokenExpirySeconds,
-  shouldRefreshToken
 } from '../utils/authUtility';
 import { AuthContext } from './AuthContext';
 
@@ -48,31 +45,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await utilityLogout(reason);
   }, []);
 
+  // authUtility의 getAccessToken 사용 (중복 코드 제거)
+  // setAccessToken 업데이트를 위해 콜백으로 감싸서 사용
   const getAccessToken = useCallback(async (): Promise<string | null> => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) return null;
-
-    // 이미 갱신 중이면 대기
-    if (isRefreshing()) {
-      return new Promise<string | null>((resolve) => {
-        addRefreshSubscriber((newToken: string) => {
-          setAccessToken(newToken);
-          resolve(newToken);
-        });
-      });
+    const token = await utilityGetAccessToken();
+    if (token) {
+      setAccessToken(token);
     }
-
-    // authUtility의 shouldRefreshToken 사용 (중복 코드 제거)
-    if (shouldRefreshToken()) {
-      const newToken = await utilityRefreshToken();
-      if (newToken) {
-        setAccessToken(newToken);
-        return newToken;
-      }
-      setAccessToken(null);
-      return null;
-    }
-    
     return token;
   }, []);
 

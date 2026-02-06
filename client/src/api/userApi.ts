@@ -12,12 +12,6 @@ export const userApi = {
     return data;
   },
 
-  // 로그아웃
-  logout: async () => {
-    const { data } = await axios.post('/api/user/logout');
-    return data;
-  },
-
   // 유저 목록 (관리자/테스트용)
   getUserList: async () => {
     const { data } = await axios.get<UserDTO[]>('/api/user/list');

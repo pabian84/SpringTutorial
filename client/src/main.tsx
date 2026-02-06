@@ -12,6 +12,7 @@ import { UserLocationProvider } from './contexts/UserLocationProvider';
 import { WebSocketProvider } from './contexts/WebSocketProvider';
 import './index.css';
 import { setupAxiosInterceptors } from './utils/axiosConfig';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // 앱 시작 시 Axios 인터셉터 설정 적용
 setupAxiosInterceptors();
@@ -35,15 +36,17 @@ createRoot(document.getElementById('root')!).render(
           },
         }}
       />
-      <BrowserRouter>
-        <UserLocationProvider>
-          <CesiumCameraProvider>
-            <WebSocketProvider>
-              <App />
-            </WebSocketProvider>
-          </CesiumCameraProvider>
-        </UserLocationProvider>
-      </BrowserRouter>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <UserLocationProvider>
+            <CesiumCameraProvider>
+              <WebSocketProvider>
+                <App />
+              </WebSocketProvider>
+            </CesiumCameraProvider>
+          </UserLocationProvider>
+        </BrowserRouter>
+      </ErrorBoundary>
     </QueryClientProvider>
   </StrictMode>,
 )

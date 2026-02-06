@@ -2,12 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { WebSocketMessage, WebSocketSendMessage } from '../types/dtos';
 import { WebSocketContext, isWebSocketMessage } from './WebSocketContext';
 import { refreshToken, isRefreshing, extractUserIdFromToken } from '../utils/authUtility';
-
-// WebSocket 재연결 타임아웃 설정
-const RECONNECT_DELAY_TOKEN_REFRESH = 500;  // 토큰 갱신 후 재연결 (ms)
-const RECONNECT_DELAY_NORMAL = 3000;        // 일반 재연결 (ms)
-const RECONNECT_DELAY_INITIAL = 200;        // 초기 연결 시도 (ms)
-const RECONNECT_DELAY_FORCE = 100;          // 강제 재연결 (ms)
+import { AUTH_CONSTANTS } from '../constants/auth';
 
 export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -101,16 +96,16 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
           if (newToken) {
             setTimeout(() => {
               connectSocketRef.current?.();
-            }, RECONNECT_DELAY_TOKEN_REFRESH);
+            }, AUTH_CONSTANTS.RECONNECT_DELAY_TOKEN_REFRESH);
           }
         });
         return;
       }
 
-      // 다른 종료 코드는 RECONNECT_DELAY_NORMAL 후 재연결
+      // 다른 종료 코드는 일반 재연결 딜레이 후 재연결
       reconnectTimerRef.current = window.setTimeout(() => {
         connectSocketRef.current?.();
-      }, RECONNECT_DELAY_NORMAL);
+      }, AUTH_CONSTANTS.RECONNECT_DELAY_NORMAL);
     };
 
     socketRef.current = ws;
@@ -156,7 +151,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   useEffect(() => {
     const timer = setTimeout(() => {
       connectSocket();
-    }, RECONNECT_DELAY_INITIAL);
+    }, AUTH_CONSTANTS.RECONNECT_DELAY_INITIAL);
     return () => clearTimeout(timer);
   }, [connectSocket]);
 
@@ -179,7 +174,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     socketRef.current = null;
     setTimeout(() => {
       connectSocket();
-    }, RECONNECT_DELAY_FORCE);
+    }, AUTH_CONSTANTS.RECONNECT_DELAY_FORCE);
   }, [connectSocket]);
 
   const sendMessage = useCallback((message: WebSocketSendMessage) => {

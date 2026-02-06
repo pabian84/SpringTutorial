@@ -5,11 +5,11 @@ import { userApi } from '../api/userApi';
 import { showAlert, showToast } from '../utils/Alert';
 import { setToken, getTokenExpirySeconds } from '../utils/authUtility';
 import { useWebSocket } from '../contexts/WebSocketContext';
-
-// 네비게이션 딜레이 설정 (WebSocket 재연결 대기)
-const NAVIGATE_DELAY_LOGIN = 100;
+import { AUTH_CONSTANTS } from '../constants/auth';
 
 export default function Login() {
+  // ⚠️ 개발용 기본값 - 운영에서는 빈 문자열로 변경하거나 제거하세요
+  // 테스트/개발 편의를 위해 초기값 설정됨 (보안 위험: 버전 관리에 포함되지 않도록 주의)
   const [id, setId] = useState('admin');
   const [password, setPassword] = useState('1234');
   const [keepLogin, setKeepLogin] = useState(false);
@@ -41,7 +41,7 @@ export default function Login() {
         // Dashboard 마운트 완료 후 네비게이트 (WebSocket 리스너 설정 대기)
         setTimeout(() => {
           navigate('/dashboard', { replace: true });
-        }, NAVIGATE_DELAY_LOGIN);
+        }, AUTH_CONSTANTS.NAVIGATE_DELAY_LOGIN);
       } else {
         throw new Error("로그인 응답 데이터 오류");
       }

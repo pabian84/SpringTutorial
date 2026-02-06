@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sessionApi } from '../api/sessionApi';
 import { chatApi, financeApi, memoApi, statsApi } from '../api/widgetApi';
-import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusDTO, SystemStatusMessage } from '../types/dtos';
+import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusMessage } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { logout } from '../utils/authUtility';
@@ -18,7 +18,7 @@ export const useDashboardData = () => {
   
   // 상태 관리
   const [chatMessages, setChatMessages] = useState<ChatHistoryDTO[]>([]);
-  const [serverData, setServerData] = useState<SystemStatusDTO[]>([]);
+  const [serverData, setServerData] = useState<SystemStatusMessage[]>([]);
   
   // 주의: ProtectedRoute에서 이미 인증을 체크하므로 여기서는 중복 체크하지 않음
   // myId가 없으면 API 호출이 enabled=false로 막히므로 안전함

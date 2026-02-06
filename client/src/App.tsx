@@ -24,7 +24,7 @@ function GlobalLogoutHandler() {
     
     window.addEventListener('authLogout', handleLogout);
     return () => window.removeEventListener('authLogout', handleLogout);
-  }, [navigate]);
+  }, [navigate]); // navigate는 React Router에서 stable하지만 명시적
   
   return null;
 }

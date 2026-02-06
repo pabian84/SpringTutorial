@@ -1,6 +1,7 @@
 // 인증 관련 유틸리티 (React 외부에서 사용 가능)
 import { sessionApi } from '../api/sessionApi';
 import { showToast } from './Alert';
+import { AUTH_CONSTANTS } from '../constants/auth';
 
 // 토큰 변경/로그아웃 이벤트 리스너 (WebSocket 재연결 및 페이지 이동용)
 const LOGOUT_EVENT = 'authLogout';
@@ -18,16 +19,15 @@ const TOKEN_CHANGE_EVENT = 'tokenChange';
 let isLoggingOut = false;
 
 // ============================================
-// ⚙️ 토큰 설정 (테스트용으로 여기서 수정)
+// ⚙️ 토큰 설정 (constants/auth.ts에서 수정)
 // ⚠️ application.yml의 access-token-validity-in-seconds와 일치시켜야 함
 // ============================================
-const IS_TEST_MODE = true; // 테스트 모드: true = 10초, false = 30분
-const TEST_TOKEN_EXPIRY = 10; // 테스트용 토큰 만료 시간 (초)
-const PROD_TOKEN_EXPIRY = 1800; // 운영용 토큰 만료 시간 (초) = 30분
 
 // 현재 설정값 가져오기 (외부에서 사용 가능)
 export const getTokenExpirySeconds = (): number => {
-  return IS_TEST_MODE ? TEST_TOKEN_EXPIRY : PROD_TOKEN_EXPIRY;
+  return AUTH_CONSTANTS.IS_TEST_MODE 
+    ? AUTH_CONSTANTS.TEST_TOKEN_EXPIRY 
+    : AUTH_CONSTANTS.PROD_TOKEN_EXPIRY;
 };
 
 // JWT 토큰에서 userId 추출
@@ -63,9 +63,9 @@ export const isRefreshing = (): boolean => {
   const value = localStorage.getItem(TOKEN_REFRESHING_KEY);
   if (!value) return false;
   
-  // 10초 이상 경과했으면 상태 초기화 (응답이 안 왔을 경우)
+  // 타임아웃 이상 경과했으면 상태 초기화 (응답이 안 왔을 경우)
   const timestamp = parseInt(value, 10);
-  if (Date.now() - timestamp > 10000) {
+  if (Date.now() - timestamp > AUTH_CONSTANTS.REFRESH_TIMEOUT) {
     localStorage.removeItem(TOKEN_REFRESHING_KEY);
     return false;
   }
@@ -85,20 +85,33 @@ export const setTokenExpiry = (expiresInSeconds: number): void => {
   localStorage.setItem(TOKEN_EXPIRY_KEY, expiresAt.toString());
 };
 
-// 토큰이 만료 임박했는지 확인 (만료 5분 전 또는 10초 미만)
+// 토큰 버퍼 시간 가져오기 (테스트/운영 모드 자동 감지)
+// 테스트 모드(10초 토큰): 2초 버퍼, 운영 모드(30분 토큰): 5분 버퍼
+const getTokenBuffer = (): number => {
+  const expiresAt = getTokenExpiry();
+  if (!expiresAt) return 0;
+  
+  const remaining = expiresAt - Date.now();
+  // 15초 미만은 테스트 모드로 간주 (10초 토큰 + 여유)
+  const isTestMode = remaining < 15000;
+  return isTestMode 
+    ? AUTH_CONSTANTS.BUFFER_TEST 
+    : AUTH_CONSTANTS.BUFFER_PROD;
+};
+
+// 토큰이 만료 임박했는지 확인
+// 테스트 모드: 만료 2초 전부터 갱신 시도
+// 운영 모드: 만료 5분 전부터 갱신 시도
 export const shouldRefreshToken = (): boolean => {
   const expiresAt = getTokenExpiry();
   if (!expiresAt) return false;
   
-  // 테스트용: 10초 만료 토큰은 2초 버퍼
-  // 실제 배포 시: 5 * 60 * 1000 (5분 버퍼) 사용
-  const expiryTime = expiresAt - Date.now();
-  const bufferTime = expiryTime < 10000 ? 2000 : 5 * 60 * 1000;
-  
-  return Date.now() >= (expiresAt - bufferTime);
+  return Date.now() >= (expiresAt - getTokenBuffer());
 };
 
 // 토큰 유효성 검사
+// 테스트 모드: 만료 2초 전까지 유효
+// 운영 모드: 만료 5분 전까지 유효
 export const isTokenValid = (): boolean => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
@@ -110,11 +123,7 @@ export const isTokenValid = (): boolean => {
     return true;
   }
   
-  // 남은 시간이 10초 미만일 때는 1초 버퍼, 그 외에는 5분 버퍼
-  const remainingTime = expiresAt - Date.now();
-  const bufferTime = remainingTime < 10000 ? 1000 : 5 * 60 * 1000;
-  
-  return Date.now() < (expiresAt - bufferTime);
+  return Date.now() < (expiresAt - getTokenBuffer());
 };
 
 // 대기열에 새 토큰 전달
