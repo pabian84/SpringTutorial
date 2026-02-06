@@ -6,7 +6,8 @@ import {
   logout as utilityLogout,
   isRefreshing,
   addRefreshSubscriber,
-  getTokenExpirySeconds
+  getTokenExpirySeconds,
+  shouldRefreshToken
 } from '../utils/authUtility';
 import { AuthContext } from './AuthContext';
 
@@ -51,13 +52,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const token = localStorage.getItem('accessToken');
     if (!token) return null;
 
-    const shouldRefresh = () => {
-      const expiresAt = localStorage.getItem('accessTokenExpiresAt');
-      if (!expiresAt) return false;
-      const fiveMinutes = 5 * 60 * 1000;
-      return Date.now() >= (parseInt(expiresAt) - fiveMinutes);
-    };
-
     // 이미 갱신 중이면 대기
     if (isRefreshing()) {
       return new Promise<string | null>((resolve) => {
@@ -68,7 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
-    if (shouldRefresh()) {
+    // authUtility의 shouldRefreshToken 사용 (중복 코드 제거)
+    if (shouldRefreshToken()) {
       const newToken = await utilityRefreshToken();
       if (newToken) {
         setAccessToken(newToken);

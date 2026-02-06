@@ -6,6 +6,9 @@ import { showAlert, showToast } from '../utils/Alert';
 import { setToken, getTokenExpirySeconds } from '../utils/authUtility';
 import { useWebSocket } from '../contexts/WebSocketContext';
 
+// 네비게이션 딜레이 설정 (WebSocket 재연결 대기)
+const NAVIGATE_DELAY_LOGIN = 100;
+
 export default function Login() {
   const [id, setId] = useState('admin');
   const [password, setPassword] = useState('1234');
@@ -38,7 +41,7 @@ export default function Login() {
         // Dashboard 마운트 완료 후 네비게이트 (WebSocket 리스너 설정 대기)
         setTimeout(() => {
           navigate('/dashboard', { replace: true });
-        }, 100);
+        }, NAVIGATE_DELAY_LOGIN);
       } else {
         throw new Error("로그인 응답 데이터 오류");
       }
