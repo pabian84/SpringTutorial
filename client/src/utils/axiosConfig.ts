@@ -27,7 +27,7 @@ export const setupAxiosInterceptors = () => {
         return config;
       }
       
-      // 토큰 갱신이 필요한 경우
+      // 토큰 갱신이 필요한 경우 (race condition 방지: isRefreshing 체크)
       if (shouldRefreshToken() && !isRefreshing()) {
         try {
           const newToken = await refreshToken();
@@ -42,6 +42,7 @@ export const setupAxiosInterceptors = () => {
         }
       } else if (isRefreshing()) {
         // 갱신 중이면 새 토큰이 나올 때까지 대기 (블로킹)
+        // refreshToken 내부에서 isRefreshing을 체크하므로 안전함
         try {
           const newToken = await refreshToken();
           if (newToken) {

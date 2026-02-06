@@ -14,6 +14,7 @@ export interface LoginResDTO {
 
 export interface RefreshSessionResDTO {
   accessToken: string;
+  refreshToken?: string;  // 새 Refresh Token (Rotation 적용 시)
 }
 
 // 기기 세션 정보 (Backend: SessionController.getMySessions)

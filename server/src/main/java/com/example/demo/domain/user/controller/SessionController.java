@@ -129,7 +129,13 @@ public class SessionController {
         // 소켓 끊기
         sessionService.forceDisconnectAll(userId);
         
-        ResponseCookie cookie = ResponseCookie.from("refreshToken", "").maxAge(0).path("/").build();
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
+                    .httpOnly(true)
+                    .path("/")
+                    .secure(false)
+                    .sameSite("Lax")
+                    .maxAge(0)
+                    .build();
         return ResponseEntity.ok().header("Set-Cookie", cookie.toString()).body("전체 로그아웃 완료");
     }
 

@@ -92,10 +92,11 @@ export const useDashboardData = () => {
     }
   }, [refetchMemos]);
 
-  // 6. 채팅 기록
+  // 6. 채팅 기록 (myId가 없으면 요청하지 않음)
   useQuery({
     queryKey: ['chatHistory'],
     queryFn: async () => {
+      if (!myId) return [];
       try {
         const data = await chatApi.getHistory();
         // API 응답(ChatHistoryDTO)을 소켓 메시지 타입(ChatMessage)으로 변환
@@ -114,6 +115,7 @@ export const useDashboardData = () => {
         return [];
       }
     },
+    enabled: !!myId, // myId가 있어야만 요청
     refetchOnWindowFocus: false,
   });
 

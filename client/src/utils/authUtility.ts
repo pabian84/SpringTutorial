@@ -167,11 +167,21 @@ export const refreshToken = async (): Promise<string | null> => {
   }
 };
 
+// 쿠키 옵션 생성 (모든 환경에서 SameSite=Lax 사용)
+// HttpOnly 쿠키이므로 JavaScript로 접근 불가, 보안상 안전
+const getCookieOptions = (): string => {
+  return 'path=/; SameSite=Lax';
+};
+
 // 쿠키 삭제 (도메인 경로 설정)
 const deleteRefreshTokenCookie = (): void => {
-  document.cookie = 'refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
-  document.cookie = 'refreshToken=; path=/; domain=localhost; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
-  document.cookie = 'refreshToken=; path=/; domain=' + window.location.hostname + '; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+  const cookieOptions = getCookieOptions();
+  const domains = ['', 'localhost', window.location.hostname];
+  
+  domains.forEach(domain => {
+    const domainPart = domain ? `; domain=${domain}` : '';
+    document.cookie = `refreshToken=;${domainPart}; expires=Thu, 01 Jan 1970 00:00:00 GMT; ${cookieOptions}`;
+  });
 };
 
 // 로그아웃
