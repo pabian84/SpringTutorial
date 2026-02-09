@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -49,4 +50,8 @@ public interface SessionMapper {
     // 마지막 접속 시간이 특정 기간(예: 30일)보다 오래된 세션 삭제
     @Delete("DELETE FROM user_sessions WHERE last_accessed_at < DATE_SUB(NOW(), INTERVAL #{days} DAY)")
     void deleteExpiredSessions(@Param("days") int days);
+
+    // 7. Refresh Token 업데이트 (Rotation)
+    @Update("UPDATE user_sessions SET refresh_token = #{refreshToken}, last_accessed_at = NOW() WHERE id = #{sessionId}")
+    void updateRefreshToken(@Param("sessionId") Long sessionId, @Param("refreshToken") String refreshToken);
 }

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.demo.domain.user.dto.RefreshSessionRes;
 import com.example.demo.domain.user.service.SessionService;
 import com.example.demo.global.security.JwtTokenProvider;
 
@@ -32,12 +33,29 @@ public class SessionController {
     private final JwtTokenProvider jwtTokenProvider;
     private final SessionService sessionService;
 
-    @Operation(summary = "쿠키에 있는 refreshToken을 사용하여 accessToken 갱신")
+    @Operation(summary = "쿠키에 있는 refreshToken을 사용하여 accessToken 갱신 (Rotation 적용)")
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@CookieValue(value = "refreshToken", required = false) String refreshToken) {
+    public ResponseEntity<RefreshSessionRes> refresh(
+            @CookieValue(value = "refreshToken", required = false) String refreshToken,
+            HttpServletResponse response) {
         try {
-            return ResponseEntity.ok(sessionService.refresh(refreshToken));
+            // Refresh Token Rotation 적용: 새 Refresh Token도 함께 발급
+            RefreshSessionRes res = sessionService.refresh(refreshToken);
+            
+            // 새 Refresh Token을 HttpOnly 쿠키로 설정
+            ResponseCookie cookie = ResponseCookie.from("refreshToken", res.getRefreshToken())
+                        .httpOnly(true)
+                        .path("/")
+                        .secure(false)  // HTTPS 환경에서는 true로 변경
+                        .sameSite("Lax")
+                        .maxAge(7 * 24 * 60 * 60)  // 7일
+                        .build();
+            
+            response.addHeader("Set-Cookie", cookie.toString());
+            
+            return ResponseEntity.ok(res);
         } catch (Exception e) {
+            // 에러 시 쿠키 삭제
             ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
                         .httpOnly(true)
                         .path("/")
@@ -45,7 +63,11 @@ public class SessionController {
                         .sameSite("Lax")
                         .maxAge(0)
                         .build();
-            return ResponseEntity.status(401).header("Set-Cookie", cookie.toString()).body("토큰 만료");
+            response.addHeader("Set-Cookie", cookie.toString());
+            
+            // 401 Unauthorized 반환
+            return ResponseEntity.status(401)
+                    .body(RefreshSessionRes.builder().build());
         }
     }
 
@@ -136,7 +158,9 @@ public class SessionController {
                     .sameSite("Lax")
                     .maxAge(0)
                     .build();
-        return ResponseEntity.ok().header("Set-Cookie", cookie.toString()).body("전체 로그아웃 완료");
+        response.addHeader("Set-Cookie", cookie.toString());
+        
+        return ResponseEntity.ok().body("전체 로그아웃 완료");
     }
 
     // [기존] 접속자 목록 (Online)

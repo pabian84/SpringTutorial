@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Component, type ErrorInfo } from 'react';
 import { showAlert } from '../../utils/Alert';
+import { devError } from '../../utils/logger';
 
 interface Props {
   children: ReactNode;
@@ -23,8 +24,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('[ErrorBoundary] Caught error:', error);
-    console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
+    devError('[ErrorBoundary] Caught error:', error);
+    devError('[ErrorBoundary] Component stack:', errorInfo.componentStack);
     
     // 운영 환경에서는 사용자에게 친화적인 메시지만 표시
     if (import.meta.env.PROD) {

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { UserLocationContext, type LocationState } from './UserLocationContext';
 import { showToast } from '../utils/Alert';
 import { useLocation } from 'react-router-dom';
+import { devError, devLog, devWarn } from '../utils/logger';
 
 // [유틸] 캐시된 위치 가져오기 (내부 사용)
 const getCachedLocation = () => {
@@ -12,7 +13,7 @@ const getCachedLocation = () => {
       return { lat: parseFloat(lat), lon: parseFloat(lon) };
     }
   } catch (e) {
-    console.error("Local Storage Error", e);
+    devError("Local Storage Error", e);
   }
   return null;
 };
@@ -101,7 +102,7 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
             if (dist < 1.0) return; 
           }
 
-          console.log("📍 [Context] 전역 위치 업데이트됨:", newLat, newLon);
+          devLog("📍 [Context] 전역 위치 업데이트됨:", newLat, newLon);
           
           // 상태 및 캐시 업데이트
           lastCoords.current = { lat: newLat, lon: newLon };
@@ -111,7 +112,7 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
           setLocation({ lat: newLat, lon: newLon, loading: false, error: null });
         },
         (err) => {
-          console.error("GPS Error:", err);
+          devError("GPS Error:", err);
           // 캐시 데이터가 없는데 에러가 난 경우에만 상태 업데이트
           if (!lastCoords.current) {
             setLocation(prev => ({ ...prev, loading: false, error: '위치 정보 수신 실패' }));
@@ -135,23 +136,23 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
           startWatching();
         } else if (result.state === 'denied') {
           showToast('위치 권한이 차단되었습니다', 'error');
-          console.warn("⚠️ 위치 권한이 차단되어 있습니다.");
+          devWarn("⚠️ 위치 권한이 차단되어 있습니다.");
           if (!lastCoords.current) {
             setLocation(prev => ({ ...prev, loading: false, error: '위치 권한이 차단되었습니다.' }));
           }
         } else if (result.state === 'prompt') {
           // 허용되지 않은 상태 -> 실행하지 않음 (경고 방지)
           // 대신 사용자가 브라우저 UI에서 '허용'으로 바꾸는 순간 실행되도록 이벤트를 겁니다.
-          console.log("⚠️ 위치 권한 대기 중 (브라우저 주소창에서 허용해주세요)");
+          devLog("⚠️ 위치 권한 대기 중 (브라우저 주소창에서 허용해주세요)");
           startWatching();
         }
 
         result.onchange = () => {
           if (result.state === 'granted') {
-            console.log("✅ 사용자가 위치 권한을 허용했습니다. 추적 시작.");
+            devLog("✅ 사용자가 위치 권한을 허용했습니다. 추적 시작.");
             startWatching();
           } else if (result.state === 'denied') {
-            console.warn("❌ 사용자가 위치 권한을 거부했습니다.");
+            devWarn("❌ 사용자가 위치 권한을 거부했습니다.");
             if (!lastCoords.current) {
               setLocation(prev => ({ ...prev, loading: false, error: '위치 권한이 차단되었습니다.' }));
             }
@@ -160,7 +161,7 @@ export const UserLocationProvider = ({ children }: { children: React.ReactNode }
       })
       .catch((error) => {
         // [핵심] HTTP 환경 등에서 Permission API가 실패할 경우 여기로 진입
-        console.warn("⚠️ Permissions API 에러 (HTTP 환경일 가능성 높음), 강제 실행 시도:", error);
+        devWarn("⚠️ Permissions API 에러 (HTTP 환경일 가능성 높음), 강제 실행 시도:", error);
         // API 확인이 실패해도 startWatching을 실행해야 watchPosition의 에러 콜백이라도 터져서 로딩이 끝남
         startWatching();
       });

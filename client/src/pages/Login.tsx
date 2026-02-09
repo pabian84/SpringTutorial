@@ -6,6 +6,7 @@ import { showAlert, showToast } from '../utils/Alert';
 import { setToken, getTokenExpirySeconds } from '../utils/authUtility';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { AUTH_CONSTANTS } from '../constants/auth';
+import { devError } from '../utils/logger';
 
 export default function Login() {
   // ⚠️ 개발용 기본값 - 운영에서는 빈 문자열로 변경하거나 제거하세요
@@ -46,7 +47,7 @@ export default function Login() {
         throw new Error("로그인 응답 데이터 오류");
       }
     } catch (e) {
-      console.error(e);
+      devError(e);
       let errorMessage = '로그인 중 오류가 발생했습니다.';
 
       if (axios.isAxiosError(e)) {

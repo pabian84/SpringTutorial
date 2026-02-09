@@ -11,5 +11,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class RefreshSessionRes {
     private String accessToken;
-    // 추후 만료 시간이나 유저 정보가 필요하면 여기에 필드 추가
+    private String refreshToken;  // Refresh Token Rotation을 위한 새 Refresh Token
 }

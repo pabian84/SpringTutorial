@@ -34,10 +34,11 @@ public class GlobalExceptionHandler {
 
     // 나머지 예외 처리 (서버 오류 등)
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleException(Exception e) {
+    public ResponseEntity<Map<String, Object>> handleException(Exception e) {
         // 그 외 진짜 서버 에러는 500으로 처리
         log.error("서버 내부 오류 발생: ", e);
-        Map<String, String> body = new HashMap<>();
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
         body.put("code", ErrorCode.INTERNAL_SERVER_ERROR.getCode());
         body.put("error", "Internal Server Error");
         body.put("message", e.getMessage());

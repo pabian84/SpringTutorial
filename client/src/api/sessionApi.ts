@@ -2,12 +2,6 @@ import axios from 'axios';
 import type { DeviceSessionDTO, RefreshSessionResDTO, UserDTO } from '../types/dtos';
 
 export const sessionApi = {
-  // 로그아웃 (서버 세션 삭제 + 쿠키 삭제)
-  logout: async () => {
-    const { data } = await axios.post('/api/user/logout');
-    return data;
-  },
-
   // 내 기기 목록 조회
   getMySessions: async () => {
     const { data } = await axios.get<DeviceSessionDTO[]>('/api/sessions');
@@ -36,7 +30,7 @@ export const sessionApi = {
     const {data} = await axios.delete('/api/sessions/all');
     return data;
   },
-  
+
   // 현재 접속자 목록 (온라인 리스트)
   getOnlineUsers: async () => {
     const { data } = await axios.get<UserDTO[]>('/api/sessions/onlineList');

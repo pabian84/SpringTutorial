@@ -1,16 +1,24 @@
 // 인증 관련 상수 (중앙化管理)
+// ⚠️ 환경 변수优先: .env 파일에서 값을 읽고, 없으면 기본값 사용
 
 export const AUTH_CONSTANTS = {
   // ============================================
   // 토큰 설정
-  // ⚠️ application.yml의 access-token-validity-in-seconds와 일치시켜야 함
+  // 사용법: .env 파일에서 VITE_IS_TEST_MODE, VITE_TOKEN_EXPIRY_SECONDS 설정
+  // 기본값: 테스트 모드 (10초), 운영 모드 (30분)
   // ============================================
-  IS_TEST_MODE: true,  // 테스트 모드: true = 10초, false = 30분
-  TEST_TOKEN_EXPIRY: 10,    // 테스트용 토큰 만료 시간 (초)
-  PROD_TOKEN_EXPIRY: 1800,  // 운영용 토큰 만료 시간 (초) = 30분
+  
+  // 테스트 모드 (환경 변수 또는 기본값 true)
+  IS_TEST_MODE: import.meta.env.VITE_IS_TEST_MODE === 'true' || true,
+  
+  // 토큰 만료 시간 (초)
+  // IS_TEST_MODE=true: 10초 (快速 테스트)
+  // IS_TEST_MODE=false: 30분 (1800초) 운영
+  TEST_TOKEN_EXPIRY: parseInt(import.meta.env.VITE_TOKEN_EXPIRY_SECONDS || '10', 10),
+  PROD_TOKEN_EXPIRY: 1800,
 
-  // Refresh Token
-  REFRESH_TOKEN_EXPIRY: 604800,  // 7일 (초)
+  // Refresh Token (7일 = 604800초, 고정)
+  REFRESH_TOKEN_EXPIRY: 604800,
 
   // ============================================
   // 토큰 버퍼 (테스트/운영 모드 자동 감지)

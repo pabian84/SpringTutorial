@@ -18,6 +18,7 @@ import com.example.demo.global.config.JwtProperties;
 import com.example.demo.global.constant.SecurityConstants;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -46,11 +47,7 @@ public class JwtTokenProvider {
             throw new IllegalArgumentException("User ID cannot be null for Access Token");
         }
         
-        // 디버깅: Refresh Token 유효기간 확인
         long refreshValidity = jwtProperties.getRefreshTokenValidityInSeconds();
-        log.info("Refresh Token 생성 - 유효기간(초): {}, 설정값(7일=604800초과 일치?: {}", 
-                refreshValidity, refreshValidity == 604800);
-        
         return createToken(userId, null, refreshValidity);
     }
 
@@ -94,8 +91,41 @@ public class JwtTokenProvider {
 
     // 안전하게 SessionId 꺼내기
     public Long getSessionId(String token) {
+        return getSessionIdFromToken(token, false);
+    }
+
+    // 만료된 토큰에서도 SessionId 꺼내기 (로그아웃용)
+    public Long getSessionIdFromExpiredToken(String token) {
+        return getSessionIdFromToken(token, true);
+    }
+
+    // 토큰에서 UserId 추출 (유효한 토큰)
+    public String getUserIdFromToken(String token) {
+        return parseClaims(token).getSubject();
+    }
+
+    // 만료된 토큰에서도 UserId 추출 (로그아웃용)
+    public String getUserIdFromExpiredToken(String token) {
         try {
-            Object sessionIdObj = parseClaims(token).get("sessionId");
+            Claims claims = parseClaimsWithExpired(token);
+            return claims.getSubject();
+        } catch (Exception e) {
+            log.error("UserId Parsing Error: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private Long getSessionIdFromToken(String token, boolean allowExpired) {
+        try {
+            Claims claims;
+            if (allowExpired) {
+                // 만료된 토큰에서도 Claims 추출
+                claims = parseClaimsWithExpired(token);
+            } else {
+                claims = parseClaims(token);
+            }
+            
+            Object sessionIdObj = claims.get("sessionId");
 
             if (sessionIdObj == null) {
                 return null;
@@ -129,12 +159,27 @@ public class JwtTokenProvider {
         try {
             parseClaims(token);
             return true;
-        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+        } catch (ExpiredJwtException e) {
             log.info("만료된 토큰입니다. (Refresh 시도 예정)"); // 에러 아님
             return false;
         } catch (Exception e) {
             log.error("유효하지 않은 토큰입니다: {}", e.getMessage());
             return false;
+        }
+    }
+
+    // 만료된 토큰에서도 Claims 추출 (로그아웃 시 세션 ID 획득용)
+    private Claims parseClaimsWithExpired(String token) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (ExpiredJwtException e) {
+            // 만료되었지만 Claims는 가져올 수 있음
+            log.debug("만료된 토큰에서 Claims 추출");
+            return e.getClaims();
         }
     }
 

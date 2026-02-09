@@ -7,11 +7,12 @@ import {
   getTokenExpirySeconds,
 } from '../utils/authUtility';
 import { AuthContext } from './AuthContext';
+import { devLog } from '../utils/logger';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // AuthProvider가 마운트되면 준비 완료 (logout은 GlobalLogoutHandler가 처리)
   useEffect(() => {
-    console.log('[AuthProvider] 마운트 완료');
+    devLog('[AuthProvider] 마운트 완료');
   }, []);
   const [accessToken, setAccessToken] = useState<string | null>(() => {
     return localStorage.getItem('accessToken');

@@ -2,6 +2,8 @@
 import { sessionApi } from '../api/sessionApi';
 import { showToast } from './Alert';
 import { AUTH_CONSTANTS } from '../constants/auth';
+import { userApi } from '../api/userApi';
+import { devError } from './logger';
 
 // 토큰 변경/로그아웃 이벤트 리스너 (WebSocket 재연결 및 페이지 이동용)
 const LOGOUT_EVENT = 'authLogout';
@@ -42,7 +44,7 @@ export const extractUserIdFromToken = (token: string): string | null => {
     const payload = JSON.parse(jsonPayload);
     return payload.sub || payload.userId || null;
   } catch (e) {
-    console.error('[authUtility] JWT 디코딩 실패:', e);
+    devError('[authUtility] JWT 디코딩 실패:', e);
     return null;
   }
 };
@@ -219,19 +221,19 @@ export const logout = async (reason?: string): Promise<void> => {
   // 2. 대기열 정리
   refreshSubscribers = [];
   
-  // 3. 쿠키 삭제
-  deleteRefreshTokenCookie();
-  
-  // 4. 로그아웃 이벤트 발생 (WebSocket 정리 + 페이지 이동)
+  // 3. 로그아웃 이벤트 발생 (WebSocket 정리 + 페이지 이동)
   emitLogoutEvent();
   
-  // 5. 서버 로그아웃 API 호출 (선택적 - 실패해도 무시)
+  // 4. 서버 로그아웃 API 호출 (선택적 - 실패해도 무시)
   try {
-    await sessionApi.logout();
+    await userApi.logout();
   } catch (e) {
     // 서버 로그아웃 실패해도 클라이언트 측 로그아웃은 이미 완료
-    console.error(e);
+    devError(e);
   }
+
+  // 5. api 호출이 끝난 뒤에 쿠키 삭제
+  deleteRefreshTokenCookie();
   
   isLoggingOut = false;
 };

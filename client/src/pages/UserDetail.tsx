@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { userApi } from '../api/userApi';
 import type { AccessLogDTO } from '../types/dtos';
 import { showAlert } from '../utils/Alert';
+import { devError } from '../utils/logger';
 
 export default function UserDetail() {
   const { userId } = useParams();
@@ -17,7 +18,7 @@ export default function UserDetail() {
         setLogs(data);
       })
       .catch(e => {
-        console.error(e);
+        devError(e);
         showAlert('오류 발생', '로그 조회 실패.', 'error');
       });
   }, [userId]);

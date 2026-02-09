@@ -14,6 +14,7 @@ import ThreeJsWidget from '../components/threejs/ThreeJsWidget'; // 위젯 임�
 import WeatherWidget from '../components/WeatherWidget';
 import { useUserLocation } from '../contexts/UserLocationContext';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { devError, devLog } from '../utils/logger';
 
 // [설정] LocalStorage 키값
 const STORAGE_KEY = 'dashboard_layouts_v1';
@@ -102,7 +103,7 @@ export default function Dashboard() {
         return JSON.parse(savedLayouts) as RGL_Layouts;
       }
     } catch (e) {
-      console.error("Failed to load layouts from storage", e);
+      devError("Failed to load layouts from storage", e);
     }
     // 없거나 에러나면 기본값 사용
     return defaultLayouts;
@@ -111,7 +112,7 @@ export default function Dashboard() {
   const [isCompactMode, setIsCompactMode] = useState(false);
   // [핸들러] 레이아웃 변경 시 LocalStorage에 저장
   const handleLayoutChange = useCallback((newLayouts: RGL_Layouts, breakpoint: string) => {
-    console.log('Layout Changed:', breakpoint);
+    devLog('Layout Changed:', breakpoint);
     setLayouts(newLayouts);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newLayouts));
     const isSmall = ['xxs'].includes(breakpoint);

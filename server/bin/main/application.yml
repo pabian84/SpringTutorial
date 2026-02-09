@@ -41,13 +41,18 @@ mybatis:
 # JWT 설정
 jwt:
   # HS256 알고리즘을 위해선 32byte(영문 32자) 이상의 긴 비밀키가 필요합니다.
-  secret: "MySuperSecretKeyForSpringTutorialProject2026!!KeepItSafe"
-  # 액세스 토큰 만료 (10초 - 테스트용) 60초 * 1분 = 60
-  # 실제 배포 시 1800 (30분)으로 변경
-  access-token-validity-in-seconds: 10
-  # 리프레시 토큰 만료 (7일) - 이게 '로그인 유지'의 핵심입니다.
-  # 60초 * 60분 * 24시 * 7일
-  refresh-token-validity-in-seconds: 604800
+  # 환경 변수: JWT_SECRET
+  secret: "${JWT_SECRET:MySuperSecretKeyForSpringTutorialProject2026!!KeepItSafe}"
+  
+  # 액세스 토큰 만료 시간 (초)
+  # 환경 변수: JWT_ACCESS_TOKEN_EXPIRY
+  # 개발: 10 (10초 - 빠른 테스트)
+  # 운영: 1800 (30분)
+  access-token-validity-in-seconds: "${JWT_ACCESS_TOKEN_EXPIRY:10}"
+  
+  # 리프레시 토큰 만료 (7일 = 604800초)
+  # 환경 변수: JWT_REFRESH_TOKEN_EXPIRY
+  refresh-token-validity-in-seconds: "${JWT_REFRESH_TOKEN_EXPIRY:604800}"
 
 # CORS 설정 (프론트엔드 주소 관리)
 app:

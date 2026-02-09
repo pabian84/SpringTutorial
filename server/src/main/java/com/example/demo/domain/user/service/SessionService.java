@@ -55,7 +55,8 @@ public class SessionService {
     }
 
     /**
-     * 토큰 갱신 (Refresh)
+     * 토큰 갱신 (Refresh Token Rotation)
+     * 보안 강화를 위해 새 Refresh Token도 함께 발급합니다.
      */
     @Transactional
     public RefreshSessionRes refresh(String refreshToken) {
@@ -70,26 +71,33 @@ public class SessionService {
         // 화면에서 '로그아웃' 버튼을 눌러 DB에서 삭제했다면, 여기서 null이 나와서 튕겨내야 합니다.
         Session session = sessionMapper.findByRefreshToken(refreshToken);
         if (session == null) {
-            throw new CustomException(ErrorCode.EXPIRED_TOKEN); // 여기서 401/403 발생 -> 프론트가 튕겨냄
+            throw new CustomException(ErrorCode.EXPIRED_TOKEN);
         }
 
-        // "토큰으로는 찾았는데, ID로는 못 찾는" 황당한 경우를 방지합니다.
-        // 필터가 findById로 검사하므로, 여기서도 똑같이 검사해서 없으면 죽여야 합니다.
+        // 3. 세션 ID 유효성 검사
         if (sessionMapper.findBySessionId(session.getId()) == null) {
             log.error("치명적 오류: 세션 불일치 감지 (토큰 O, ID X) - 강제 만료 처리. ID: {}", session.getId());
-            // 여기서 예외를 던지면 axiosConfig가 401로 인식하고 로그인 페이지로 보냅니다.
             throw new CustomException(ErrorCode.SESSION_NOT_FOUND);
         }
 
-        // 4. 새 액세스 토큰 발급
         String userId = session.getUserId();
-        String newAccessToken = jwtTokenProvider.createAccessToken(userId, session.getId());
+        Long sessionId = session.getId();
+
+        // 4. 새 Refresh Token 생성 (Rotation) - 보안 강화
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
+
+        // 5. DB에 새 Refresh Token 업데이트
+        sessionMapper.updateRefreshToken(sessionId, newRefreshToken);
+
+        // 6. 새 Access Token 발급
+        String newAccessToken = jwtTokenProvider.createAccessToken(userId, sessionId);
 
         RefreshSessionRes response = RefreshSessionRes.builder()
                     .accessToken(newAccessToken)
+                    .refreshToken(newRefreshToken)
                     .build();
-        log.info("새 액세스 토큰 발급 완료 for userId={}: {}", userId, newAccessToken);
-        
+        log.info("토큰 갱신 완료 (Rotation 적용) for userId={}, sessionId={}", userId, sessionId);
+
         return response;
     }
 

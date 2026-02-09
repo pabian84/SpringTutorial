@@ -12,6 +12,12 @@ export const userApi = {
     return data;
   },
 
+  // 로그아웃 (서버 세션 삭제 + 쿠키 삭제)
+  logout: async () => {
+    const { data } = await axios.post('/api/user/logout');
+    return data;
+  },
+
   // 유저 목록 (관리자/테스트용)
   getUserList: async () => {
     const { data } = await axios.get<UserDTO[]>('/api/user/list');

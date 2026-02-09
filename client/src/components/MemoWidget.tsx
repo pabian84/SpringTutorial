@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { memoApi } from '../api/widgetApi';
 import type { MemoDTO } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
+import { devError } from '../utils/logger';
 
 // 부모(Dashboard)로부터 받을 Props 정의
 interface MemoWidgetProps {
@@ -29,7 +30,7 @@ export function StandaloneMemoWidget() {
       const data = await memoApi.getMemos(myId);
       setMemos(data);
     } catch (e) {
-      console.error("메모 로딩 실패", e);
+      devError("메모 로딩 실패", e);
     }
   }, [myId]);
 
@@ -56,7 +57,7 @@ export function StandaloneMemoWidget() {
       await memoApi.addMemo(myId!, content);
       fetchMemos(); // 재로딩
     } catch (e) {
-      console.error("메모 추가 실패", e);
+      devError("메모 추가 실패", e);
       showToast('메모 저장 실패', 'error');
     }
   };
@@ -72,7 +73,7 @@ export function StandaloneMemoWidget() {
         showToast('메모가 삭제되었습니다.', 'success');
         fetchMemos(); // 재로딩
       } catch (e) {
-        console.error("메모 삭제 실패", e);
+        devError("메모 삭제 실패", e);
         showToast('삭제 중 오류가 발생했습니다.', 'error');
       }
     }
