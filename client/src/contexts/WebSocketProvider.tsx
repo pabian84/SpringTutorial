@@ -1,42 +1,42 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { WebSocketMessage, WebSocketSendMessage } from '../types/dtos';
 import { WebSocketContext, isWebSocketMessage } from './WebSocketContext';
-import { extractUserIdFromToken, isAuthenticated } from '../utils/authUtility';
+import { isAuthenticated } from '../utils/authUtility';
+import { useAuth } from './AuthContext';
 import { AUTH_CONSTANTS } from '../constants/auth';
 
 export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
-  
+  const { user } = useAuth(); // 인증된 사용자 정보
+
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const isConnectingRef = useRef(false);
-  
+  const isLoggedOutRef = useRef(false); // 로그아웃 후 재연결 방지
+
   // useCallback 참조 저장 (재귀 호출용)
   const connectSocketRef = useRef<(() => void) | null>(null);
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const WS_URL = `${protocol}//${window.location.host}`;
 
-  const connectSocket = useCallback(() => {
-    // 인증 상태 확인
-    if (!isAuthenticated()) {
+  const connectSocket = useCallback(async () => {
+    // 로그아웃 후 재연결 방지
+    if (isLoggedOutRef.current) {
       return;
     }
 
-    // 토큰이 없으면 연결하지 않음
-    const token = localStorage.getItem('accessToken');
-    let myId = localStorage.getItem('myId');
-
-    // myId가 없으면 JWT에서 추출
-    if (!myId && token) {
-      myId = extractUserIdFromToken(token);
-      if (myId) {
-        localStorage.setItem('myId', myId);
-      }
+    // 인증 상태 확인 (비동기)
+    const isAuth = await isAuthenticated();
+    if (!isAuth) {
+      return;
     }
 
-    if (!token || !myId) {
+    // myId는 useAuth에서 가져옴 (localStorage 대신)
+    const myId = user?.id;
+    if (!myId) {
+      // myId가 없으면 인증되지 않은 것으로 간주
       return;
     }
 
@@ -57,7 +57,10 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     }
 
     isConnectingRef.current = true;
-    const ws = new WebSocket(`${WS_URL}/ws?userId=${myId}&token=${token}`);
+
+    // 쿠키가 자동으로 전송되므로 URL 파라미터에서 토큰 제거
+    // 서버의 JwtHandshakeInterceptor가 쿠키에서 토큰을 읽음
+    const ws = new WebSocket(`${WS_URL}/ws`);
 
     ws.onopen = () => {
       isConnectingRef.current = false;
@@ -79,11 +82,12 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
       }
     };
 
-    ws.onclose = (event: CloseEvent) => {
+    ws.onclose = async (event: CloseEvent) => {
       isConnectingRef.current = false;
-      
+
       // 인증 상태 확인 후 재연결 여부 결정
-      if (!isAuthenticated()) {
+      const isAuth = await isAuthenticated();
+      if (!isAuth) {
         setIsConnected(false);
         socketRef.current = null;
         return;
@@ -110,23 +114,25 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     };
 
     socketRef.current = ws;
-  }, [WS_URL]);
+  }, [WS_URL, user]);
 
   // connectSocket 참조 저장
   useEffect(() => {
     connectSocketRef.current = connectSocket;
   }, [connectSocket]);
 
-  // 토큰 변경 이벤트 감지
+  // 로그인/로그아웃 이벤트 감지
   useEffect(() => {
-    const handleTokenChange = () => {
-      if (isAuthenticated()) {
+    const handleAuthLogin = async () => {
+      const isAuth = await isAuthenticated();
+      if (isAuth) {
         connectSocket();
       }
     };
-    
-    // 로그아웃 이벤트 감지 (WebSocket 정리)
+
     const handleLogout = () => {
+      isLoggedOutRef.current = true; // 로그아웃 상태로 설정
+
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
@@ -137,19 +143,25 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
         reconnectTimerRef.current = null;
       }
     };
-    
-    window.addEventListener('tokenChange', handleTokenChange);
+
+    window.addEventListener('authLogin', handleAuthLogin);
     window.addEventListener('authLogout', handleLogout);
     return () => {
-      window.removeEventListener('tokenChange', handleTokenChange);
+      window.removeEventListener('authLogin', handleAuthLogin);
       window.removeEventListener('authLogout', handleLogout);
     };
   }, [connectSocket]);
 
   // 초기 연결 시도
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isAuthenticated()) {
+    const timer = setTimeout(async () => {
+      // 로그아웃 상태면 연결하지 않음
+      if (isLoggedOutRef.current) {
+        return;
+      }
+
+      const isAuth = await isAuthenticated();
+      if (isAuth) {
         connectSocket();
       }
     }, AUTH_CONSTANTS.RECONNECT_DELAY_INITIAL);
@@ -168,8 +180,14 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     };
   }, []);
 
-  const forceReconnect = useCallback(() => {
-    if (!isAuthenticated()) {
+  const forceReconnect = useCallback(async () => {
+    // 로그아웃 후 재연결 방지
+    if (isLoggedOutRef.current) {
+      return;
+    }
+
+    const isAuth = await isAuthenticated();
+    if (!isAuth) {
       return;
     }
     if (socketRef.current) {
@@ -188,11 +206,11 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   }, []);
 
   return (
-    <WebSocketContext.Provider value={{ 
-      isConnected, 
-      lastMessage, 
+    <WebSocketContext.Provider value={{
+      isConnected,
+      lastMessage,
       sendMessage,
-      forceReconnect 
+      forceReconnect
     }}>
       {children}
     </WebSocketContext.Provider>

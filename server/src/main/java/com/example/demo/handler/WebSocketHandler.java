@@ -1,7 +1,6 @@
 package com.example.demo.handler;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,6 +14,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import com.example.demo.domain.chat.service.ChatService;
 import com.example.demo.domain.stats.service.SystemStatusService;
 import com.example.demo.domain.user.service.SessionService;
+import com.example.demo.global.util.CookieUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -138,18 +138,8 @@ public class WebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    // 유틸: ID 파싱 (UserConnectionHandler 로직 유지)
+    // 유틸: ID 파싱 (공용 CookieUtil.getUserIdFromSession 사용)
     private String getUserIdFromSession(WebSocketSession session) {
-        try {
-            URI uri = session.getUri();
-            if (uri != null && uri.getQuery() != null) {
-                String query = uri.getQuery();
-                for (String param : query.split("&")) {
-                    String[] pair = param.split("=");
-                    if (pair.length == 2 && "userId".equals(pair[0])) return pair[1];
-                }
-            }
-        } catch (Exception e) {}
-        return null;
+        return CookieUtil.getUserIdFromSession(session);
     }
 }

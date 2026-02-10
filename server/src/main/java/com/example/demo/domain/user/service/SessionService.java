@@ -1,6 +1,5 @@
 package com.example.demo.domain.user.service;
 
-import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +23,7 @@ import com.example.demo.global.constant.SecurityConstants;
 import com.example.demo.global.exception.CustomException;
 import com.example.demo.global.exception.ErrorCode;
 import com.example.demo.global.security.JwtTokenProvider;
+import com.example.demo.global.util.CookieUtil;
 import com.example.demo.handler.WebSocketHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -224,22 +224,8 @@ public class SessionService {
         }
     }
 
-    // URL 파싱 (?userId=xxx)
+    // HTTP attributes 또는 URL 파라미터에서 userId 추출 (공용 CookieUtil.getUserIdFromSession 사용)
     private String getUserIdFromSession(WebSocketSession session) {
-        try {
-            URI uri = session.getUri();
-            if (uri != null && uri.getQuery() != null) {
-                String query = uri.getQuery();
-                for (String param : query.split("&")) {
-                    String[] pair = param.split("=");
-                    if (pair.length == 2 && "userId".equals(pair[0])) {
-                        return pair[1];
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("ID 파싱 실패", e);
-        }
-        return null;
+        return CookieUtil.getUserIdFromSession(session);
     }
 }

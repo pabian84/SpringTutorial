@@ -3,6 +3,7 @@ import { memoApi } from '../api/widgetApi';
 import type { MemoDTO } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 import { devError } from '../utils/logger';
+import { useAuth } from '../contexts/AuthContext';
 
 // 부모(Dashboard)로부터 받을 Props 정의
 interface MemoWidgetProps {
@@ -20,8 +21,8 @@ export default function MemoWidget(props: MemoWidgetProps) {
 // 독립 실행형 메모 위젯 컴포넌트
 export function StandaloneMemoWidget() {
   const [memos, setMemos] = useState<MemoDTO[]>([]);
-  // 로그인한 내 아이디 가져오기
-  const myId = localStorage.getItem('myId');
+  const { user } = useAuth(); // 인증된 사용자 정보
+  const myId = user?.id;
 
   // 데이터 로딩
   const fetchMemos = useCallback(async () => {

@@ -64,7 +64,7 @@ public class UserController {
             response.addHeader("Set-Cookie", accessCookie.toString());
 
             Map<String, Object> body = new HashMap<>();
-            body.put("accessToken", result.getAccessToken());
+            // accessToken은 httpOnly 쿠키로 전달되므로 응답 바디에는 포함하지 않음
             body.put("user", result.getUser());
             
             return ResponseEntity.ok(body);

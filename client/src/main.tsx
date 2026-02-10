@@ -9,7 +9,6 @@ import { Toaster } from 'react-hot-toast';
 import App from './App.tsx';
 import { CesiumCameraProvider } from './contexts/CesiumCameraProvider';
 import { UserLocationProvider } from './contexts/UserLocationProvider';
-import { WebSocketProvider } from './contexts/WebSocketProvider';
 import './index.css';
 import { setupAxiosInterceptors } from './utils/axiosConfig';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -40,9 +39,7 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <UserLocationProvider>
             <CesiumCameraProvider>
-              <WebSocketProvider>
-                <App />
-              </WebSocketProvider>
+              <App />
             </CesiumCameraProvider>
           </UserLocationProvider>
         </BrowserRouter>

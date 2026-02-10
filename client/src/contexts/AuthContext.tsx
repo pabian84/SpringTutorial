@@ -1,14 +1,24 @@
 import { createContext, useContext } from 'react';
 
+// 사용자 정보 타입
+export interface UserInfo {
+  id: string;
+  name: string;
+}
+
 // 인증 상태 타입 정의
 export interface AuthContextType {
-  accessToken: string | null;
-  myId: string | null;
+  authState: {
+    authenticated: boolean;
+    user: UserInfo | null;
+    loading: boolean;
+  };
   isAuthenticated: boolean;
-  isTokenValid: () => boolean;
-  getAccessToken: () => Promise<string | null>;
-  login: (token: string, userId: string) => void;
+  isLoading: boolean;
+  user: UserInfo | null;
+  login: (token: string, userId: string, userName: string) => void;
   logout: (reason?: string) => Promise<void>;
+  checkAuth: () => Promise<boolean>;
 }
 
 // Context 객체 생성

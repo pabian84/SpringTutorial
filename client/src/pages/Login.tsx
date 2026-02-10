@@ -3,43 +3,44 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userApi } from '../api/userApi';
 import { showAlert, showToast } from '../utils/Alert';
-import { setToken, getTokenExpirySeconds } from '../utils/authUtility';
+import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { AUTH_CONSTANTS } from '../constants/auth';
 import { devError } from '../utils/logger';
 
 export default function Login() {
-  // ⚠️ 개발용 기본값 - 운영에서는 빈 문자열로 변경하거나 제거하세요
-  // 테스트/개발 편의를 위해 초기값 설정됨 (보안 위험: 버전 관리에 포함되지 않도록 주의)
+  // 개발용 기본값
   const [id, setId] = useState('admin');
   const [password, setPassword] = useState('1234');
   const [keepLogin, setKeepLogin] = useState(false);
   const navigate = useNavigate();
   const { forceReconnect } = useWebSocket();
+  const { isAuthenticated, login } = useAuth();
 
+  // 이미 인증되어 있으면 대시보드로 (App.tsx의 PublicRoute가 처리하지만 중첩 방지)
   useEffect(() => {
-    if (localStorage.getItem('accessToken')) {
-      navigate('/dashboard');
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
     }
-  }, [navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const data = await userApi.login(id, password, keepLogin);
-      const { user, accessToken } = data;
+      const { user } = data;
 
-      if (accessToken && user) {
-        // authUtility를 통해 토큰 설정 (application.yml과 동기화)
-        setToken(accessToken, getTokenExpirySeconds());
-        localStorage.setItem('myId', user.id);
-        
+      if (user) {
+        // 토큰은 httpOnly 쿠키로 서버에서 설정됨
+        // 인증 컨텍스트 업데이트 (myId 설정 + 이벤트 발생)
+        login('httpOnlyCookie', user.id, user.name);
+
         showToast(`환영합니다, ${user.name}님!`, 'success');
-        
-        // WebSocket 강제 재연결 (토큰 변경 후)
+
+        // WebSocket 강제 재연결 (쿠키 설정 후)
         forceReconnect();
-        
-        // Dashboard 마운트 완료 후 네비게이트 (WebSocket 리스너 설정 대기)
+
+        // Dashboard 마운트 완료 후 네비게이트
         setTimeout(() => {
           navigate('/dashboard', { replace: true });
         }, AUTH_CONSTANTS.NAVIGATE_DELAY_LOGIN);
@@ -98,38 +99,38 @@ export default function Login() {
     <div style={styles.container}>
       <div style={styles.card}>
         <h1 style={styles.title}>Welcome Back</h1>
-        
+
         <form onSubmit={handleLogin}>
           <div style={{ marginBottom: 20 }}>
             <label style={styles.label}>Username</label>
-            <input 
-              value={id} 
-              onChange={e => setId(e.target.value)} 
-              placeholder="아이디를 입력하세요" 
+            <input
+              value={id}
+              onChange={e => setId(e.target.value)}
+              placeholder="아이디를 입력하세요"
             />
           </div>
-          
+
           <div style={{ marginBottom: 30 }}>
             <label style={styles.label}>Password</label>
-            <input 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-              type="password" 
-              placeholder="비밀번호를 입력하세요" 
+            <input
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              type="password"
+              placeholder="비밀번호를 입력하세요"
             />
           </div>
           <div style={{ marginBottom: 20, textAlign: 'left', color: '#ccc' }}>
             <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-              <input 
-                type="checkbox" 
-                checked={keepLogin} 
+              <input
+                type="checkbox"
+                checked={keepLogin}
                 onChange={e => setKeepLogin(e.target.checked)}
-                style={{ width: 'auto', marginRight: 10, marginBottom: 0 }} 
+                style={{ width: 'auto', marginRight: 10, marginBottom: 0 }}
               />
               로그인 상태 유지
             </label>
           </div>
-          
+
           <button type="submit">Login</button>
         </form>
       </div>

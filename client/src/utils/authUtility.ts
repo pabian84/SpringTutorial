@@ -1,164 +1,152 @@
-// 인증 관련 유틸리티 (React 외부에서 사용 가능)
+// 인증 관련 유틸리티 (httpOnly 쿠키 기반)
+import axios from 'axios';
 import { showToast } from './Alert';
-import { AUTH_CONSTANTS } from '../constants/auth';
 import { userApi } from '../api/userApi';
+import { AUTH_CONSTANTS } from '../constants/auth';
 import { devError } from './logger';
 
-// 토큰 변경/로그아웃 이벤트 리스너 (WebSocket 재연결 및 페이지 이동용)
+// 이벤트 리스너 키
 const LOGOUT_EVENT = 'authLogout';
 const LOGIN_EVENT = 'authLogin';
 
-// 로그아웃 이벤트 발생 (WebSocket 정리용)
-export const emitLogoutEvent = (): void => {
-  window.dispatchEvent(new CustomEvent(LOGOUT_EVENT));
-};
-
-// 로그인 이벤트 발생
-export const emitLoginEvent = (): void => {
-  window.dispatchEvent(new CustomEvent(LOGIN_EVENT));
-};
-
-const TOKEN_EXPIRY_KEY = 'accessTokenExpiresAt';
-const AUTH_STATE_KEY = 'isAuthenticated'; // 로그인 상태 플래그
-
 // ============================================
-// ⚙️ 토큰 설정 (constants/auth.ts에서 수정)
-// ⚠️ application.yml의 access-token-validity-in-seconds와 일치시켜야 함
+// 단일 인증 확인 (Singleton Pattern)
+// 중복 API 호출 방지
 // ============================================
 
-// 현재 설정값 가져오기 (외부에서 사용 가능)
+let authCheckPromise: Promise<{ authenticated: boolean; user?: UserInfo }> | null = null;
+let authCheckResult: { authenticated: boolean; user?: UserInfo } | null = null;
+
+// 사용자 정보 타입
+interface UserInfo {
+  id: string;
+  name: string;
+}
+
+/**
+ * 인증 상태 확인 API 호출
+ * - 한 번만 호출하고 결과를 캐싱
+ * - 로그아웃 시 resetAuthCheck() 호출 필요
+ */
+export const checkAuthStatus = async (): Promise<{ authenticated: boolean; user?: UserInfo }> => {
+  // 이미 확인 완료했으면 캐시된 결과 반환
+  if (authCheckResult !== null) {
+    return authCheckResult;
+  }
+
+  // 이미 확인 중이면 해당 프라미스 반환 (경쟁 조건 방지)
+  if (authCheckPromise !== null) {
+    return authCheckPromise;
+  }
+
+  // 최초 확인 시작
+  authCheckPromise = axios.get('/api/auth/check')
+    .then(response => {
+      const result = {
+        authenticated: true,
+        user: response.data.user as UserInfo
+      };
+      authCheckResult = result;
+      return result;
+    })
+    .catch(error => {
+      // 401은 인증되지 않은 것 - 정상적인 케이스
+      if (error.response?.status === 401) {
+        authCheckResult = { authenticated: false };
+        return authCheckResult;
+      }
+      // 다른 에러는 일단 인증 실패로 처리
+      devError('[authUtility] 인증 확인 중 오류:', error);
+      authCheckResult = { authenticated: false };
+      return authCheckResult;
+    })
+    .finally(() => {
+      // 프라미스 참조 정리 (다음 호출 시 새 요청 허용)
+      authCheckPromise = null;
+    });
+
+  return authCheckPromise;
+};
+
+/**
+ * 인증 확인 결과 리셋
+ * - 로그아웃 시 호출하여 캐시된 결과 삭제
+ */
+export const resetAuthCheck = (): void => {
+  authCheckPromise = null;
+  authCheckResult = null;
+};
+
+// ============================================
+// 토큰 설정 (constants/auth.ts에서 수정)
+// 하위 호환성을 위해 유지
+// ============================================
+
+// 현재 설정값 가져오기
 export const getTokenExpirySeconds = (): number => {
   return AUTH_CONSTANTS.IS_TEST_MODE
     ? AUTH_CONSTANTS.TEST_TOKEN_EXPIRY
     : AUTH_CONSTANTS.PROD_TOKEN_EXPIRY;
 };
 
-// JWT 토큰에서 userId 추출
-export const extractUserIdFromToken = (token: string): string | null => {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
+// ============================================
+// 이벤트 관련
+// ============================================
 
-    const payload = JSON.parse(jsonPayload);
-    return payload.sub || payload.userId || null;
-  } catch (e) {
-    devError('[authUtility] JWT 디코딩 실패:', e);
-    return null;
-  }
+export const emitLogoutEvent = (): void => {
+  window.dispatchEvent(new CustomEvent(LOGOUT_EVENT));
 };
 
-// 토큰 만료 시간 가져오기
-export const getTokenExpiry = (): number | null => {
-  const expiresAt = localStorage.getItem(TOKEN_EXPIRY_KEY);
-  return expiresAt ? parseInt(expiresAt, 10) : null;
+export const emitLoginEvent = (): void => {
+  window.dispatchEvent(new CustomEvent(LOGIN_EVENT));
 };
 
-// 토큰 만료 시간 설정
-export const setTokenExpiry = (expiresInSeconds: number): void => {
-  const expiresAt = Date.now() + (expiresInSeconds * 1000);
-  localStorage.setItem(TOKEN_EXPIRY_KEY, expiresAt.toString());
+// ============================================
+// 인증 상태 확인
+// ============================================
+
+/**
+ * 인증 상태 확인
+ * - 내부적으로 checkAuthStatus를 사용
+ */
+export const isAuthenticated = async (): Promise<boolean> => {
+  const result = await checkAuthStatus();
+  return result.authenticated;
 };
 
-// 토큰 버퍼 시간 가져오기 (테스트/운영 모드 자동 감지)
-const getTokenBuffer = (): number => {
-  const expiresAt = getTokenExpiry();
-  if (!expiresAt) return 0;
-
-  const remaining = expiresAt - Date.now();
-  // 20초 미만은 테스트 모드로 간주 (15초 토큰 + 여유)
-  const isTestMode = remaining < 20000;
-  return isTestMode
-    ? AUTH_CONSTANTS.BUFFER_TEST
-    : AUTH_CONSTANTS.BUFFER_PROD;
-};
-
-// 토큰이 만료 임박했는지 확인
-export const shouldRefreshToken = (): boolean => {
-  const expiresAt = getTokenExpiry();
-  if (!expiresAt) return false;
-
-  return Date.now() >= (expiresAt - getTokenBuffer());
-};
-
-// 토큰 유효성 검사
-export const isTokenValid = (): boolean => {
-  const token = localStorage.getItem('accessToken');
-  if (!token) {
-    return false;
-  }
-
-  const expiresAt = getTokenExpiry();
-  if (!expiresAt) {
-    return true;
-  }
-
-  return Date.now() < (expiresAt - getTokenBuffer());
-};
-
-// 인증 상태 확인 (localStorage 플래그 사용)
-export const isAuthenticated = (): boolean => {
-  // localStorage의 인증 상태 플래그 확인
-  const authState = localStorage.getItem(AUTH_STATE_KEY);
-  if (authState === 'true') {
-    return true;
-  }
-  // 플래그가 없으면 토큰 유효성으로 판단 (하위 호환성)
-  return isTokenValid();
-};
-
+// ============================================
 // 로그아웃
+// ============================================
+
 export const logout = async (reason?: string, skipApi = false): Promise<void> => {
-  // 토스트 표시 (있는 경우)
+  // 토스트 표시
   if (reason) {
     showToast(reason, 'error');
   }
 
-  // 1. userId 미리 추출 (localStorage 삭제 전)
-  const userId = localStorage.getItem('myId');
+  // 1. 인증 확인 결과 리셋
+  resetAuthCheck();
 
-  // 2. 인증 상태 플래그 즉시 false로 설정 (API 호출 차단)
-  localStorage.setItem(AUTH_STATE_KEY, 'false');
-
-  // 3. 로컬 스토리지 선택적 정리 (safeKeys 제외)
-  const safeKeys = ['theme', 'language', 'sidebarState']; // 유지할 키들
+  // 2. 로컬 스토리지 선택적 정리 (safeKeys 제외)
+  const safeKeys = ['theme', 'language', 'sidebarState'];
   const allKeys = Object.keys(localStorage);
-  
+
   allKeys.forEach(key => {
     if (!safeKeys.includes(key)) {
       localStorage.removeItem(key);
     }
   });
 
-  // 4. 로그아웃 이벤트 발생 (WebSocket 정리 + 페이지 이동)
+  // 3. 로그아웃 이벤트 발생 (WebSocket 정리 + 페이지 이동)
   emitLogoutEvent();
 
-  // 5. 서버 로그아웃 API 호출 (skipApi 플래그로 무한 루프 방지)
+  // 4. 서버 로그아웃 API 호출
   if (!skipApi) {
     try {
-      await userApi.logout(userId || undefined);
+      // body에 userId를 전달하여 토큰 없이도 로그아웃 처리
+      await userApi.logout(undefined);
     } catch (e) {
-      // 서버 로그아웃 실패해도 클라이언트 측 로그아웃은 이미 완료
       devError(e);
     }
   }
-};
-
-// 토큰 설정 (로그인 시 사용)
-export const setToken = (token: string, expiresInSeconds: number): void => {
-  localStorage.setItem('accessToken', token);
-  setTokenExpiry(expiresInSeconds);
-  
-  // 인증 상태 플래그 설정 (API 호출 허용)
-  localStorage.setItem(AUTH_STATE_KEY, 'true');
-
-  // 토큰 변경 이벤트 발생 (WebSocket 재연결용)
-  window.dispatchEvent(new Event('tokenChange'));
-};
-
-// 토큰 가져오기
-export const getAccessToken = (): string | null => {
-  return localStorage.getItem('accessToken');
 };

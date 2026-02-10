@@ -6,12 +6,14 @@ import { chatApi, financeApi, memoApi, statsApi } from '../api/widgetApi';
 import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusMessage } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { logout } from '../utils/authUtility';
+import { logout, resetAuthCheck } from '../utils/authUtility';
+import { useAuth } from '../contexts/AuthContext';
 
 export const useDashboardData = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const myId = localStorage.getItem('myId');
+  const { user } = useAuth();
+  const myId = user?.id;
   
   // Context 사용
   const { lastMessage, sendMessage } = useWebSocket();
@@ -28,13 +30,15 @@ export const useDashboardData = () => {
     queryKey: ['onlineUsers'], 
     queryFn: sessionApi.getOnlineUsers,
     enabled: !!myId,
+    retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
   // 3. 환율 데이터
   const { data: exchangeData = [] } = useQuery({
     queryKey: ['exchangeData'],
     queryFn: financeApi.getExchangeRates,
-    staleTime: 1000 * 60 // 1분 캐시
+    staleTime: 1000 * 60, // 1분 캐시
+    retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
   // 4. 코드 통계 데이터
@@ -49,7 +53,8 @@ export const useDashboardData = () => {
       chartData.sort((a, b) => b.value - a.value);
       return chartData as CodeData[];
     },
-    staleTime: 1000 * 60 * 10 // 10분 캐시
+    staleTime: 1000 * 60 * 10, // 10분 캐시
+    retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
   // 5. 메모 데이터
@@ -62,7 +67,8 @@ export const useDashboardData = () => {
        return await memoApi.getMemos(myId);
     },
     enabled: !!myId, 
-    refetchOnWindowFocus: false, 
+    refetchOnWindowFocus: false,
+    retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
   // 메모 추가 핸들러
@@ -117,6 +123,7 @@ export const useDashboardData = () => {
     },
     enabled: !!myId, // myId가 있어야만 요청
     refetchOnWindowFocus: false,
+    retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
   // === [WebSocket 수신 처리] ===
@@ -160,8 +167,9 @@ export const useDashboardData = () => {
 
       case 'FORCE_LOGOUT':
         showToast('다른 기기에서 접속하여 로그아웃되었습니다.', 'error');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('myId');
+        // 인증 확인 결과 리셋
+        resetAuthCheck();
+        // AuthProvider의 상태도 정리되어야 함 (logout 호출)
         navigate('/');
         break;
     }
