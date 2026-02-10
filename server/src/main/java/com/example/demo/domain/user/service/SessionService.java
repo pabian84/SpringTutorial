@@ -289,4 +289,9 @@ public class SessionService {
         }
         return null;
     }
+
+    // keepLogin 조회
+    public Boolean getKeepLogin(Long sessionId) {
+        return sessionMapper.getKeepLoginBySessionId(sessionId);
+    }
 }

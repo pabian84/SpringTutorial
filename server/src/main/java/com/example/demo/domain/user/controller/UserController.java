@@ -20,6 +20,7 @@ import com.example.demo.domain.user.entity.AccessLog;
 import com.example.demo.domain.user.service.SessionService;
 import com.example.demo.domain.user.service.UserService;
 import com.example.demo.global.security.JwtTokenProvider;
+import com.example.demo.global.util.CookieUtil;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,19 +39,8 @@ public class UserController {
 
     private final SessionService sessionService;
     private final UserService userService;
-    // 토큰 해석기 (세션 ID 꺼내기용)
     private final JwtTokenProvider jwtTokenProvider;
-
-    // 쿠키 옵션 생성 (환경별 SameSite 처리)
-    private ResponseCookie createRefreshTokenCookie(String refreshToken, int maxAge, boolean isHttps) {
-        return ResponseCookie.from("refreshToken", refreshToken)
-                    .httpOnly(true)
-                    .path("/")
-                    .secure(isHttps)  // HTTPS 환경에서만 true
-                    .sameSite(isHttps ? "None" : "Lax")  // HTTPS: None, HTTP: Lax
-                    .maxAge(maxAge)
-                    .build();
-    }
+    private final CookieUtil cookieUtil;
 
     @Operation(summary = "로그인")
     @PostMapping("/login")
@@ -68,8 +58,13 @@ public class UserController {
 
             // 환경별 쿠키 옵션 적용
             boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
-            ResponseCookie cookie = createRefreshTokenCookie(result.getRefreshToken(), maxAge, isHttps);
-            response.addHeader("Set-Cookie", cookie.toString());
+            // 새 Refresh Token을 HttpOnly 쿠키로 설정
+            ResponseCookie refreshCookie = cookieUtil.createTokenCookie("refreshToken", result.getRefreshToken(), 7 * 24 * 60 * 60, isHttps);
+            // 새 Access Token을 HttpOnly 쿠키로 설정 (keepLogin에 따라 maxAge 결정)
+            ResponseCookie accessCookie = cookieUtil.createTokenCookie("accessToken", result.getAccessToken(), maxAge, isHttps);
+
+            response.addHeader("Set-Cookie", refreshCookie.toString());
+            response.addHeader("Set-Cookie", accessCookie.toString());
 
             Map<String, Object> body = new HashMap<>();
             body.put("accessToken", result.getAccessToken());
@@ -104,8 +99,13 @@ public class UserController {
         
         // 환경별 쿠키 옵션 적용
         boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
-        ResponseCookie cookie = createRefreshTokenCookie("", 0, isHttps);
-        return ResponseEntity.ok().header("Set-Cookie", cookie.toString()).body("로그아웃 되었습니다.");
+        ResponseCookie refreshCookie = cookieUtil.deleteCookie("refreshToken", isHttps);
+        ResponseCookie accessCookie = cookieUtil.deleteCookie("accessToken", isHttps);
+        
+        response.addHeader("Set-Cookie", refreshCookie.toString());
+        response.addHeader("Set-Cookie", accessCookie.toString());
+
+        return ResponseEntity.ok().body("로그아웃 되었습니다.");
     }
 
     @Operation(summary = "사용자 활동 로그 조회")

@@ -17,9 +17,9 @@ public interface SessionMapper {
     // 1. 세션 저장 (로그인 시)
     // DB 컬럼명(snake_case)과 객체 필드명(camelCase) 매핑은 application.yml 설정에 따름
     @Insert("INSERT INTO user_sessions " +
-            "(user_id, refresh_token, device_type, user_agent, ip_address, location, last_accessed_at, created_at) " +
+            "(user_id, refresh_token, device_type, user_agent, ip_address, location, keep_login, last_accessed_at, created_at) " +
             "VALUES " +
-            "(#{userId}, #{refreshToken}, #{deviceType}, #{userAgent}, #{ipAddress}, #{location}, NOW(), NOW())")
+            "(#{userId}, #{refreshToken}, #{deviceType}, #{userAgent}, #{ipAddress}, #{location}, #{keepLogin}, NOW(), NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id") // AI 키값 받아오기
     void insertSession(Session session);
 
@@ -54,4 +54,8 @@ public interface SessionMapper {
     // 7. Refresh Token 업데이트 (Rotation)
     @Update("UPDATE user_sessions SET refresh_token = #{refreshToken}, last_accessed_at = NOW() WHERE id = #{sessionId}")
     void updateRefreshToken(@Param("sessionId") Long sessionId, @Param("refreshToken") String refreshToken);
+
+    // 8. keepLogin 조회
+    @Select("SELECT keep_login FROM user_sessions WHERE id = #{sessionId}")
+    Boolean getKeepLoginBySessionId(@Param("sessionId") Long sessionId);
 }

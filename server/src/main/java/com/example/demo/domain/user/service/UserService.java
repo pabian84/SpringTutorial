@@ -69,6 +69,7 @@ public class UserService {
             .userAgent(userAgent)
             .ipAddress(ipAddress)
             .location("Unknown")
+            .keepLogin(loginReq.isRememberMe())
             .build(); // createdAt 등은 DB에서 NOW()로 처리하거나 여기서 넣거나
         sessionMapper.insertSession(session);
 

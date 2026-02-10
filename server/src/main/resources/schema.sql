@@ -20,6 +20,7 @@ CREATE TABLE if not exists user_sessions (
     user_agent VARCHAR(255),             -- 브라우저 정보
     ip_address VARCHAR(50),
     location VARCHAR(100),
+    keep_login BOOLEAN DEFAULT FALSE,     -- 로그인 유지 여부
     last_accessed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

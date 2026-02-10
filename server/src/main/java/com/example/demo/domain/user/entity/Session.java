@@ -19,4 +19,5 @@ public class Session {
     
     private LocalDateTime lastAccessedAt; // 마지막 활동 시간
     private LocalDateTime createdAt;      // 최초 로그인 시간
+    private Boolean keepLogin;             // 로그인 유지 여부 (true=지속적, false=브라우저 닫으면 종료)
 }

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.demo.domain.user.dto.RefreshSessionRes;
 import com.example.demo.domain.user.service.SessionService;
 import com.example.demo.global.security.JwtTokenProvider;
+import com.example.demo.global.util.CookieUtil;
 
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,38 +33,46 @@ public class SessionController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final SessionService sessionService;
+    private final CookieUtil cookieUtil;
 
     @Operation(summary = "쿠키에 있는 refreshToken을 사용하여 accessToken 갱신 (Rotation 적용)")
     @PostMapping("/refresh")
     public ResponseEntity<RefreshSessionRes> refresh(
             @CookieValue(value = "refreshToken", required = false) String refreshToken,
-            HttpServletResponse response) {
+            @AuthenticationPrincipal UserDetails userDetails,
+            HttpServletRequest request, HttpServletResponse response) {
         try {
+            // refreshToken에서 sessionId 추출 (accessToken 파싱 불필요)
+            Long sessionId = (refreshToken != null) ? jwtTokenProvider.getSessionId(refreshToken) : null;
+            
+            // keepLogin 조회 (브라우저 닫으면 종료할지 여부)
+            Boolean keepLogin = (sessionId != null) ? sessionService.getKeepLogin(sessionId) : false;
+            int accessMaxAge = (Boolean.TRUE.equals(keepLogin)) ? 15 * 60 : -1; // true=15분, false=브라우저 세션
+            
             // Refresh Token Rotation 적용: 새 Refresh Token도 함께 발급
             RefreshSessionRes res = sessionService.refresh(refreshToken);
             
-            // 새 Refresh Token을 HttpOnly 쿠키로 설정
-            ResponseCookie cookie = ResponseCookie.from("refreshToken", res.getRefreshToken())
-                        .httpOnly(true)
-                        .path("/")
-                        .secure(false)  // HTTPS 환경에서는 true로 변경
-                        .sameSite("Lax")
-                        .maxAge(7 * 24 * 60 * 60)  // 7일
-                        .build();
+            // 환경별 쿠키 옵션 적용
+            boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
             
-            response.addHeader("Set-Cookie", cookie.toString());
+            // 새 Refresh Token을 HttpOnly 쿠키로 설정
+            ResponseCookie refreshCookie = cookieUtil.createTokenCookie("refreshToken", res.getRefreshToken(), 7 * 24 * 60 * 60, isHttps);
+            
+            // 새 Access Token을 HttpOnly 쿠키로 설정 (keepLogin에 따라 maxAge 결정)
+            ResponseCookie accessCookie = cookieUtil.createTokenCookie("accessToken", res.getAccessToken(), accessMaxAge, isHttps);
+            
+            response.addHeader("Set-Cookie", refreshCookie.toString());
+            response.addHeader("Set-Cookie", accessCookie.toString());
             
             return ResponseEntity.ok(res);
         } catch (Exception e) {
             // 에러 시 쿠키 삭제
-            ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
-                        .httpOnly(true)
-                        .path("/")
-                        .secure(false)
-                        .sameSite("Lax")
-                        .maxAge(0)
-                        .build();
-            response.addHeader("Set-Cookie", cookie.toString());
+            boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
+            ResponseCookie refreshCookie = cookieUtil.deleteCookie("refreshToken", isHttps);
+            ResponseCookie accessCookie = cookieUtil.deleteCookie("accessToken", isHttps);
+            
+            response.addHeader("Set-Cookie", refreshCookie.toString());
+            response.addHeader("Set-Cookie", accessCookie.toString());
             
             // 401 Unauthorized 반환
             return ResponseEntity.status(401)
@@ -151,14 +160,13 @@ public class SessionController {
         // 소켓 끊기
         sessionService.forceDisconnectAll(userId);
         
-        ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
-                    .httpOnly(true)
-                    .path("/")
-                    .secure(false)
-                    .sameSite("Lax")
-                    .maxAge(0)
-                    .build();
-        response.addHeader("Set-Cookie", cookie.toString());
+        // 환경별 쿠키 옵션 적용
+        boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
+        ResponseCookie refreshCookie = cookieUtil.deleteCookie("refreshToken", isHttps);
+        ResponseCookie accessCookie = cookieUtil.deleteCookie("accessToken", isHttps);
+        
+        response.addHeader("Set-Cookie", refreshCookie.toString());
+        response.addHeader("Set-Cookie", accessCookie.toString());
         
         return ResponseEntity.ok().body("전체 로그아웃 완료");
     }
