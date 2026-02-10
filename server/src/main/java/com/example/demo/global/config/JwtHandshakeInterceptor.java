@@ -39,7 +39,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
             // 2. 토큰 유효성 검사
             if (token != null && jwtTokenProvider.validateToken(token)) {
                 
-                // 3. [핵심] DB 생존 확인 (세션 바인딩)
+                // 3. DB 생존 확인 (세션 바인딩)
                 Long sessionId = jwtTokenProvider.getSessionId(token);
                 
                 if (sessionId == null || sessionMapper.findBySessionId(sessionId) == null) {

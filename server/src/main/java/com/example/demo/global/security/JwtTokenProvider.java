@@ -145,12 +145,23 @@ public class JwtTokenProvider {
         }
     }
 
-    // 3. 헤더에서 토큰 꺼내기 (Bearer 제거)
+    // 3. 헤더에서 토큰 꺼내기 (Bearer 제거) + 쿠키에서 Access Token 읽기
     public String resolveToken(HttpServletRequest req) {
+        // 1. Authorization 헤더에서 먼저 확인
         String bearerToken = req.getHeader(SecurityConstants.AUTH_HEADER);
         if (bearerToken != null && bearerToken.startsWith(SecurityConstants.TOKEN_PREFIX)) {
             return bearerToken.substring(SecurityConstants.TOKEN_PREFIX.length());
         }
+        
+        // 2. 쿠키에서 Access Token 읽기
+        if (req.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : req.getCookies()) {
+                if ("accessToken".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        
         return null;
     }
 

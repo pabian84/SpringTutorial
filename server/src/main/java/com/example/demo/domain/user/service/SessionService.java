@@ -140,6 +140,7 @@ public class SessionService {
         }
         //DB 삭제
         sessionMapper.deleteBySessionId(targetSessionId);
+        log.warn("delete " + currentUserId + ", targetSessionId: " + targetSessionId);
         // 로그 기록 (약식)
         accessLogService.saveLog(currentUserId, currentSessionId, SecurityConstants.TYPE_KICK, null, null, null, null);
     }
@@ -191,14 +192,18 @@ public class SessionService {
     }
 
     public void removeSession(WebSocketSession session) throws JsonProcessingException {
+        log.warn("removeSession 1");
         String userId = getUserIdFromSession(session);
         if (userId != null) {
+            log.warn("removeSession 2");
             Set<WebSocketSession> userSessions = webSocketSessionsMap.get(userId);
             if (userSessions != null) {
+                log.warn("removeSession 3");
                 // 목록에서 제거
                 userSessions.remove(session);
                 // 더 이상 남은 세션이 없으면 오프라인 처리
                 if (userSessions.isEmpty()) {
+                    log.warn("removeSession 4");
                     webSocketSessionsMap.remove(userId);
                     userService.updateUserStatus(userId, false); // DB Offline 처리
 
@@ -207,6 +212,8 @@ public class SessionService {
                     data.put("onlineUserCount", webSocketSessionsMap.size());
 
                     webSocketHandler.broadcast(data);
+                } else {
+                    log.warn("removeSession 5");
                 }
             }
         }
