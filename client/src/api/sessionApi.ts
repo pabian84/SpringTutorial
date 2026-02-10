@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DeviceSessionDTO, RefreshSessionResDTO, UserDTO } from '../types/dtos';
+import type { DeviceSessionDTO, UserDTO } from '../types/dtos';
 
 export const sessionApi = {
   // 내 기기 목록 조회
@@ -8,10 +8,8 @@ export const sessionApi = {
     return data;
   },
 
-  refreshToken: async () => {
-    const {data} = await axios.post<RefreshSessionResDTO>('/api/sessions/refresh');
-    return data;
-  },
+  // NOTE: refreshToken 쿠키 제거로 /refresh endpoint 제거
+  // accessToken 만료 시 재로그인 필요
 
   // 특정 기기 강제 로그아웃 (Kick)
   revokeSession: async (targetSessionId: number) => {

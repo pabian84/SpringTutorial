@@ -58,12 +58,9 @@ public class UserController {
 
             // 환경별 쿠키 옵션 적용
             boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
-            // 새 Refresh Token을 HttpOnly 쿠키로 설정
-            ResponseCookie refreshCookie = cookieUtil.createTokenCookie("refreshToken", result.getRefreshToken(), 7 * 24 * 60 * 60, isHttps);
-            // 새 Access Token을 HttpOnly 쿠키로 설정 (keepLogin에 따라 maxAge 결정)
+            
+            // Access Token을 HttpOnly 쿠키로 설정
             ResponseCookie accessCookie = cookieUtil.createTokenCookie("accessToken", result.getAccessToken(), maxAge, isHttps);
-
-            response.addHeader("Set-Cookie", refreshCookie.toString());
             response.addHeader("Set-Cookie", accessCookie.toString());
 
             Map<String, Object> body = new HashMap<>();
@@ -80,29 +77,42 @@ public class UserController {
 
     @Operation(summary = "로그아웃")
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
-        String token = jwtTokenProvider.resolveToken(request);
-        Long sessionId = null;
+    public ResponseEntity<?> logout(@RequestBody(required = false) Map<String, String> body, HttpServletRequest request, HttpServletResponse response) {
         String userId = null;
+        Long sessionId = null;
+        String token = jwtTokenProvider.resolveToken(request);
         
+        // body에서 userId 우선 사용 (토큰 만료 시)
+        if (body != null && body.containsKey("userId")) {
+            userId = body.get("userId");
+        }
+        
+        // 토큰이 유효하면 sessionId 추출
         if (token != null && jwtTokenProvider.validateToken(token)) {
             sessionId = jwtTokenProvider.getSessionId(token);
-            userId = jwtTokenProvider.getAuthentication(token).getName();
+            if (userId == null) {
+                userId = jwtTokenProvider.getAuthentication(token).getName();
+            }
         }
-
-        if (userId != null && sessionId != null) {
+        
+        if (userId != null) {
             String userAgent = request.getHeader("User-Agent");
             String ipAddress = request.getRemoteAddr();
-            userService.logout(userId, sessionId, userAgent, ipAddress); 
-            sessionService.forceDisconnectOne(userId, sessionId);
+            // sessionId가 있으면 해당 세션만, 없으면 전체 로그아웃
+            if (sessionId != null) {
+                userService.logout(userId, sessionId, userAgent, ipAddress);
+                sessionService.forceDisconnectOne(userId, sessionId);
+            } else {
+                // 토큰이 없거나 만료된 경우: 사용자의 모든 세션 삭제
+                userService.logoutAll(userId, userAgent, ipAddress);
+                sessionService.forceDisconnectAll(userId);
+            }
         }
         
         // 환경별 쿠키 옵션 적용
         boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
-        ResponseCookie refreshCookie = cookieUtil.deleteCookie("refreshToken", isHttps);
         ResponseCookie accessCookie = cookieUtil.deleteCookie("accessToken", isHttps);
         
-        response.addHeader("Set-Cookie", refreshCookie.toString());
         response.addHeader("Set-Cookie", accessCookie.toString());
 
         return ResponseEntity.ok().body("로그아웃 되었습니다.");

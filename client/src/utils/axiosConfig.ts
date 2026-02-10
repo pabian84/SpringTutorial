@@ -1,12 +1,25 @@
-import axios, { AxiosHeaders } from 'axios';
+import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { showToast } from './Alert';
-import { 
-  shouldRefreshToken, 
-  addRefreshSubscriber, 
-  refreshToken, 
-  logout,
-  isRefreshing
-} from './authUtility';
+import { logout, isAuthenticated } from './authUtility';
+
+// 인증이 필요한지 확인하는 함수
+const needsAuthentication = (url: string): boolean => {
+  // 인증이 필요 없는 public 엔드포인트 목록
+  const publicEndpoints = [
+    '/api/user/login',
+    '/api/user/logout',
+    '/api/sessions/refresh',
+  ];
+
+  // public 엔드포인트는 인증 없이 허용
+  for (const endpoint of publicEndpoints) {
+    if (url.includes(endpoint)) {
+      return false;
+    }
+  }
+
+  return true;
+};
 
 // Axios 전역 설정
 export const setupAxiosInterceptors = () => {
@@ -15,53 +28,32 @@ export const setupAxiosInterceptors = () => {
 
   // 1. 요청 인터셉터
   axios.interceptors.request.use(
-    async (config) => {
-      // 리프레시 요청일 때는 토큰 제외
-      if (config.url && config.url.includes('/refresh')) {
+    async (config: InternalAxiosRequestConfig) => {
+      const url = config.url || '';
+
+      // public 엔드포인트는 인증 없이 허용
+      if (!needsAuthentication(url)) {
         return config;
       }
-      
+
+      // 인증 상태 확인 (localStorage 플래그 사용)
+      if (!isAuthenticated()) {
+        // 로그인 상태가 아니면 요청 차단
+        return Promise.reject(new Error('Not authenticated'));
+      }
+
       // 토큰이 없으면 그대로 반환
       const token = localStorage.getItem('accessToken');
       if (!token) {
         return config;
       }
-      
-      // 토큰 갱신이 필요한 경우 (race condition 방지: isRefreshing 체크)
-      if (shouldRefreshToken() && !isRefreshing()) {
-        try {
-          const newToken = await refreshToken();
-          if (newToken) {
-            if (!config.headers) {
-              config.headers = new AxiosHeaders();
-            }
-            config.headers.set('Authorization', `Bearer ${newToken}`);
-          }
-        } catch {
-          // 갱신 실패해도 요청은 진행 (응답 인터셉터에서 401 처리)
-        }
-      } else if (isRefreshing()) {
-        // 갱신 중이면 새 토큰이 나올 때까지 대기 (블로킹)
-        // refreshToken 내부에서 isRefreshing을 체크하므로 안전함
-        try {
-          const newToken = await refreshToken();
-          if (newToken) {
-            if (!config.headers) {
-              config.headers = new AxiosHeaders();
-            }
-            config.headers.set('Authorization', `Bearer ${newToken}`);
-          }
-        } catch {
-          // 갱신 실패해도 요청은 진행
-        }
-      } else if (token) {
-        // 토큰이 유효하면 헤더에 추가
-        if (!config.headers) {
-          config.headers = new AxiosHeaders();
-        }
-        config.headers.set('Authorization', `Bearer ${token}`);
+
+      // 토큰이 유효하면 헤더에 추가
+      if (!config.headers) {
+        config.headers = new AxiosHeaders();
       }
-      
+      config.headers.set('Authorization', `Bearer ${token}`);
+
       return config;
     },
     (error) => Promise.reject(error)
@@ -71,8 +63,13 @@ export const setupAxiosInterceptors = () => {
   axios.interceptors.response.use(
     (response) => response,
     async (error) => {
+      // 인증 에러가 이미 처리되었으면 스킵
+      if (error.message === 'Not authenticated') {
+        return Promise.reject(error);
+      }
+
       const originalRequest = error.config;
-      
+
       // 네트워크 에러 (서버 응답 없음)
       if (!error.response) {
         return Promise.reject(error);
@@ -81,92 +78,42 @@ export const setupAxiosInterceptors = () => {
       const { status, data } = error.response;
       const errorCode = data?.code;
 
-      // 리프레시 요청 401 -> 즉시 로그아웃 (refresh 토큰 자체가 만료됨)
-      if (originalRequest.url?.includes('/refresh') && status === 401) {
-        showToast('로그인 세션이 만료되었습니다. 다시 로그인해주세요.', 'error');
-        logout();
+      // 로그아웃 요청 401 -> 이미 로그아웃됨
+      if (originalRequest?.url?.includes('/logout') && status === 401) {
+        logout(undefined, true); // skipApi=true로 무한 루프 방지
         return Promise.reject(error);
       }
 
-      // 로그아웃 요청 401 -> 이미 로그아웃됨
-      if (originalRequest.url?.includes('/logout') && status === 401) {
-        logout();
+      // 로그아웃 요청 403 -> 토큰 만료로 인한 것일 수 있음
+      if (originalRequest?.url?.includes('/logout') && status === 403) {
+        logout(undefined, true); // skipApi=true로 무한 루프 방지
         return Promise.reject(error);
       }
 
       // 403 접근 거부
       if (status === 403) {
-        // 이미 logout 중이면 중복 호출 방지
-        if (isRefreshing()) {
-          return new Promise((resolve) => {
-            addRefreshSubscriber((token: string) => {
-              if (originalRequest.headers instanceof AxiosHeaders) {
-                originalRequest.headers.set('Authorization', `Bearer ${token}`);
-              } else {
-                originalRequest.headers['Authorization'] = `Bearer ${token}`;
-              }
-              resolve(axios(originalRequest));
-            });
-          });
-        }
-        
-        // 토큰이 이미 정리되었으면 중복 로그아웃 방지
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          // 이미 로그아웃 상태
-          return Promise.reject(error);
-        }
-        
+        const errorCode = data?.code;
         if (errorCode === 'A006') {
           showToast("본인의 기기만 로그아웃 할 수 있습니다.", "error");
         } else {
           showToast("접근이 거부되었습니다.", "error");
         }
-        logout();
+        logout(undefined, true); // skipApi=true로 무한 루프 방지
         return Promise.reject(error);
       }
 
       // 404 세션 없음
       if (status === 404 && errorCode === 'S001') {
-        logout();
+        logout(undefined, true);
         return Promise.reject(error);
       }
 
-      // 401 Unauthorized - 토큰 만료 의심
-      if (status === 401 && !originalRequest._retry) {
-        originalRequest._retry = true;
-
-        // 이미 갱신 중이면 대기
-        if (isRefreshing()) {
-          return new Promise((resolve) => {
-            addRefreshSubscriber((token: string) => {
-              if (originalRequest.headers instanceof AxiosHeaders) {
-                originalRequest.headers.set('Authorization', `Bearer ${token}`);
-              } else {
-                originalRequest.headers['Authorization'] = `Bearer ${token}`;
-              }
-              resolve(axios(originalRequest));
-            });
-          });
-        }
-
-        // 토큰 갱신 시도
-        try {
-          const newToken = await refreshToken();
-          if (newToken) {
-            if (originalRequest.headers instanceof AxiosHeaders) {
-              originalRequest.headers.set('Authorization', `Bearer ${newToken}`);
-            } else {
-              originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-            }
-            return axios(originalRequest);
-          }
-          logout();
-          return Promise.reject(error);
-        } catch {
-          logout();
-          return Promise.reject(error);
-        }
+      // 401 Unauthorized - 토큰 만료로 간주하고 로그아웃
+      // (refreshToken이 없으므로 재로그인 필요)
+      if (status === 401 && !originalRequest?._retry) {
+        showToast('세션이 만료되었습니다. 다시 로그인해주세요.', 'error');
+        logout(undefined, true); // skipApi=true로 무한 루프 방지
+        return Promise.reject(error);
       }
 
       return Promise.reject(error);

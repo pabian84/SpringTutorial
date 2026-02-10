@@ -10,6 +10,5 @@ import lombok.Getter;
 @AllArgsConstructor
 public class LoginRes {
     private String accessToken;
-    private String refreshToken;
     private User user;
 }

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { WebSocketMessage, WebSocketSendMessage } from '../types/dtos';
 import { WebSocketContext, isWebSocketMessage } from './WebSocketContext';
-import { refreshToken, isRefreshing, extractUserIdFromToken } from '../utils/authUtility';
+import { extractUserIdFromToken, isAuthenticated } from '../utils/authUtility';
 import { AUTH_CONSTANTS } from '../constants/auth';
 
 export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
@@ -19,7 +19,12 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   const WS_URL = `${protocol}//${window.location.host}`;
 
   const connectSocket = useCallback(() => {
-    // 토큰이 없으면 연결하지 않음 (pathname 체크 제거 - Dashboard mounting 시 연결 허용)
+    // 인증 상태 확인
+    if (!isAuthenticated()) {
+      return;
+    }
+
+    // 토큰이 없으면 연결하지 않음
     const token = localStorage.getItem('accessToken');
     let myId = localStorage.getItem('myId');
 
@@ -77,6 +82,13 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     ws.onclose = (event: CloseEvent) => {
       isConnectingRef.current = false;
       
+      // 인증 상태 확인 후 재연결 여부 결정
+      if (!isAuthenticated()) {
+        setIsConnected(false);
+        socketRef.current = null;
+        return;
+      }
+
       // 정상 종료 또는 로그인 페이지면 재연결하지 않음
       if (event.code === 1000 || window.location.pathname === '/') {
         setIsConnected(false);
@@ -87,25 +99,14 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
       setIsConnected(false);
       socketRef.current = null;
 
-      // 1006(비정상 종료)면 토큰 갱신 후 재연결
-      if (event.code === 1006) {
-        if (isRefreshing()) {
-          return;
-        }
-        refreshToken().then((newToken) => {
-          if (newToken) {
-            setTimeout(() => {
-              connectSocketRef.current?.();
-            }, AUTH_CONSTANTS.RECONNECT_DELAY_TOKEN_REFRESH);
-          }
-        });
-        return;
-      }
-
-      // 다른 종료 코드는 일반 재연결 딜레이 후 재연결
+      // 재연결 시도 (일반 재연결)
       reconnectTimerRef.current = window.setTimeout(() => {
         connectSocketRef.current?.();
       }, AUTH_CONSTANTS.RECONNECT_DELAY_NORMAL);
+    };
+
+    ws.onerror = () => {
+      isConnectingRef.current = false;
     };
 
     socketRef.current = ws;
@@ -119,9 +120,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   // 토큰 변경 이벤트 감지
   useEffect(() => {
     const handleTokenChange = () => {
-      const token = localStorage.getItem('accessToken');
-      const myId = localStorage.getItem('myId');
-      if (token && myId) {
+      if (isAuthenticated()) {
         connectSocket();
       }
     };
@@ -150,7 +149,9 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   // 초기 연결 시도
   useEffect(() => {
     const timer = setTimeout(() => {
-      connectSocket();
+      if (isAuthenticated()) {
+        connectSocket();
+      }
     }, AUTH_CONSTANTS.RECONNECT_DELAY_INITIAL);
     return () => clearTimeout(timer);
   }, [connectSocket]);
@@ -168,6 +169,9 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   }, []);
 
   const forceReconnect = useCallback(() => {
+    if (!isAuthenticated()) {
+      return;
+    }
     if (socketRef.current) {
       socketRef.current.close();
     }

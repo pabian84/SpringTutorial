@@ -91,7 +91,6 @@ public class UserService {
         // 5. 결과 반환 (쿠키 설정은 컨트롤러에게 위임)
         return LoginRes.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)
                 .user(user)
                 .build();
     }
@@ -106,6 +105,20 @@ public class UserService {
         }
         // 2. 로그 기록
         accessLogService.saveLog(userId, sessionId, SecurityConstants.TYPE_LOGOUT, ipAddress, null, userAgent, "/api/user/logout");
+    }
+    
+    // 로그아웃 처리 (전체 기기 - 토큰 없이)
+    @Transactional
+    @CacheEvict(value = "online_users", allEntries = true)
+    public void logoutAll(String userId, String userAgent, String ipAddress) {
+        // 1. 사용자의 모든 세션 삭제
+        List<Session> sessions = sessionMapper.findByUserId(userId);
+        for (Session session : sessions) {
+            sessionMapper.deleteBySessionId(session.getId());
+            accessLogService.saveLog(userId, session.getId(), SecurityConstants.TYPE_LOGOUT, ipAddress, null, userAgent, "/api/user/logout");
+        }
+        // 2. 상태 업데이트 (오프라인으로)
+        userMapper.updateStatus(userId, false);
     }
 
     // 반환 타입이 List<User> -> List<UserRes>로 변경

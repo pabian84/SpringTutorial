@@ -13,8 +13,10 @@ export const userApi = {
   },
 
   // 로그아웃 (서버 세션 삭제 + 쿠키 삭제)
-  logout: async () => {
-    const { data } = await axios.post('/api/user/logout');
+  // userId: 토큰 만료 시 body로 전달
+  logout: async (userId?: string) => {
+    const body = userId ? { userId } : {};
+    const { data } = await axios.post('/api/user/logout', body);
     return data;
   },
 

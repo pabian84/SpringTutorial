@@ -10,14 +10,7 @@ import org.springframework.stereotype.Component;
 public class CookieUtil {
 
     /**
-     * Token 쿠키 생성
-     */
-    public ResponseCookie createTokenCookie(String cookieName, String token, int maxAge) {
-        return createTokenCookie(cookieName, token, maxAge, false);
-    }
-
-    /**
-     * Token 쿠키 생성
+     * 토큰 쿠키 생성 (공통 메서드)
      */
     public ResponseCookie createTokenCookie(String cookieName, String token, int maxAge, boolean isHttps) {
         return ResponseCookie.from(cookieName, token)
@@ -27,13 +20,6 @@ public class CookieUtil {
                     .sameSite(isHttps ? "None" : "Lax")
                     .maxAge(maxAge)
                     .build();
-    }
-
-    /**
-     * 쿠키 삭제 (maxAge=0)
-     */
-    public ResponseCookie deleteCookie(String cookieName) {
-        return deleteCookie(cookieName, false);
     }
 
     /**

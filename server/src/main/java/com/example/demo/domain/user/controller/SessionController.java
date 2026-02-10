@@ -6,7 +6,6 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.domain.user.dto.RefreshSessionRes;
 import com.example.demo.domain.user.service.SessionService;
 import com.example.demo.global.security.JwtTokenProvider;
 import com.example.demo.global.util.CookieUtil;
@@ -35,50 +33,8 @@ public class SessionController {
     private final SessionService sessionService;
     private final CookieUtil cookieUtil;
 
-    @Operation(summary = "쿠키에 있는 refreshToken을 사용하여 accessToken 갱신 (Rotation 적용)")
-    @PostMapping("/refresh")
-    public ResponseEntity<RefreshSessionRes> refresh(
-            @CookieValue(value = "refreshToken", required = false) String refreshToken,
-            @AuthenticationPrincipal UserDetails userDetails,
-            HttpServletRequest request, HttpServletResponse response) {
-        try {
-            // refreshToken에서 sessionId 추출 (accessToken 파싱 불필요)
-            Long sessionId = (refreshToken != null) ? jwtTokenProvider.getSessionId(refreshToken) : null;
-            
-            // keepLogin 조회 (브라우저 닫으면 종료할지 여부)
-            Boolean keepLogin = (sessionId != null) ? sessionService.getKeepLogin(sessionId) : false;
-            int accessMaxAge = (Boolean.TRUE.equals(keepLogin)) ? 15 * 60 : -1; // true=15분, false=브라우저 세션
-            
-            // Refresh Token Rotation 적용: 새 Refresh Token도 함께 발급
-            RefreshSessionRes res = sessionService.refresh(refreshToken);
-            
-            // 환경별 쿠키 옵션 적용
-            boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
-            
-            // 새 Refresh Token을 HttpOnly 쿠키로 설정
-            ResponseCookie refreshCookie = cookieUtil.createTokenCookie("refreshToken", res.getRefreshToken(), 7 * 24 * 60 * 60, isHttps);
-            
-            // 새 Access Token을 HttpOnly 쿠키로 설정 (keepLogin에 따라 maxAge 결정)
-            ResponseCookie accessCookie = cookieUtil.createTokenCookie("accessToken", res.getAccessToken(), accessMaxAge, isHttps);
-            
-            response.addHeader("Set-Cookie", refreshCookie.toString());
-            response.addHeader("Set-Cookie", accessCookie.toString());
-            
-            return ResponseEntity.ok(res);
-        } catch (Exception e) {
-            // 에러 시 쿠키 삭제
-            boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
-            ResponseCookie refreshCookie = cookieUtil.deleteCookie("refreshToken", isHttps);
-            ResponseCookie accessCookie = cookieUtil.deleteCookie("accessToken", isHttps);
-            
-            response.addHeader("Set-Cookie", refreshCookie.toString());
-            response.addHeader("Set-Cookie", accessCookie.toString());
-            
-            // 401 Unauthorized 반환
-            return ResponseEntity.status(401)
-                    .body(RefreshSessionRes.builder().build());
-        }
-    }
+    // NOTE: refreshToken 쿠키 제거로 /refresh endpoint 제거
+    // accessToken 만료 시 재로그인 필요
 
     // 1. 내 기기 목록 조회
     @GetMapping
@@ -99,13 +55,13 @@ public class SessionController {
             String token = jwtTokenProvider.resolveToken(request);
             // 헤더 대신 토큰에서 내 세션 ID 추출
             Long currentSessionId = jwtTokenProvider.getSessionId(token);
-            
+
             // [깔끔해짐] 서비스가 검증하고 삭제까지 다 함
             sessionService.deleteSession(targetSessionId, currentSessionId);
-            
+
             // 소켓 끊기 (이건 Presentation Layer인 컨트롤러가 Handler를 호출하는 게 맞음)
             sessionService.forceDisconnectOne(currentUserId, targetSessionId);
-            
+
             return ResponseEntity.ok("선택한 기기를 로그아웃 시켰습니다.");
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -118,13 +74,13 @@ public class SessionController {
     @DeleteMapping("/others")
     public ResponseEntity<?> revokeOtherSessions(@AuthenticationPrincipal UserDetails userDetails, HttpServletRequest request) {
         String userId = userDetails.getUsername();
-        
+
         // 토큰 조회
         String token = jwtTokenProvider.resolveToken(request);
         if (token == null) {
              return ResponseEntity.status(401).body("인증 토큰이 없습니다.");
         }
-        
+
         // 헤더 대신 토큰에서 내 세션 ID 추출
         Long currentSessionId = jwtTokenProvider.getSessionId(token);
         if (currentSessionId == null) {
@@ -135,7 +91,7 @@ public class SessionController {
         sessionService.deleteOtherSessions(userId, currentSessionId);
         // 소켓 끊기
         sessionService.forceDisconnectOthers(userId, currentSessionId);
-        
+
         return ResponseEntity.ok("다른 모든 기기에서 로그아웃 되었습니다.");
     }
 
@@ -149,7 +105,7 @@ public class SessionController {
         if (token == null) {
              return ResponseEntity.status(401).body("인증 토큰이 없습니다.");
         }
-        
+
         // 헤더 대신 토큰에서 내 세션 ID 추출
         Long currentSessionId = jwtTokenProvider.getSessionId(token);
         if (currentSessionId == null) {
@@ -159,15 +115,13 @@ public class SessionController {
         sessionService.deleteAllSessions(userId, currentSessionId);
         // 소켓 끊기
         sessionService.forceDisconnectAll(userId);
-        
+
         // 환경별 쿠키 옵션 적용
         boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
-        ResponseCookie refreshCookie = cookieUtil.deleteCookie("refreshToken", isHttps);
         ResponseCookie accessCookie = cookieUtil.deleteCookie("accessToken", isHttps);
-        
-        response.addHeader("Set-Cookie", refreshCookie.toString());
+
         response.addHeader("Set-Cookie", accessCookie.toString());
-        
+
         return ResponseEntity.ok().body("전체 로그아웃 완료");
     }
 

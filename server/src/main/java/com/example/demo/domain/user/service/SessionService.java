@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 
-import com.example.demo.domain.user.dto.RefreshSessionRes;
 import com.example.demo.domain.user.dto.UserRes;
 import com.example.demo.domain.user.entity.Session;
 import com.example.demo.domain.user.mapper.SessionMapper;
@@ -37,7 +36,6 @@ public class SessionService {
     private final SessionMapper sessionMapper;
     private final UserMapper userMapper; // Online List 조회용
     private final UserService userService;
-    private final JwtTokenProvider jwtTokenProvider;
     private final AccessLogService accessLogService;
     private final WebSocketHandler webSocketHandler;
 
@@ -49,57 +47,12 @@ public class SessionService {
         this.sessionMapper = sessionMapper;
         this.userMapper = userMapper;
         this.userService = userService;
-        this.jwtTokenProvider = jwtTokenProvider;
         this.accessLogService = accessLogService;
         this.webSocketHandler = webSocketHandler;
     }
 
-    /**
-     * 토큰 갱신 (Refresh Token Rotation)
-     * 보안 강화를 위해 새 Refresh Token도 함께 발급합니다.
-     */
-    @Transactional
-    public RefreshSessionRes refresh(String refreshToken) {
-        log.warn("리프레시 토큰으로 액세스 토큰 재발급 시도: {}", refreshToken);
-
-        // 1. 토큰 유효성 검사 (서명 위조 등)
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
-            throw new CustomException(ErrorCode.INVALID_TOKEN);
-        }
-
-        // 2. DB(user_sessions)에 해당 토큰이 살아있는지 확인!
-        // 화면에서 '로그아웃' 버튼을 눌러 DB에서 삭제했다면, 여기서 null이 나와서 튕겨내야 합니다.
-        Session session = sessionMapper.findByRefreshToken(refreshToken);
-        if (session == null) {
-            throw new CustomException(ErrorCode.EXPIRED_TOKEN);
-        }
-
-        // 3. 세션 ID 유효성 검사
-        if (sessionMapper.findBySessionId(session.getId()) == null) {
-            log.error("치명적 오류: 세션 불일치 감지 (토큰 O, ID X) - 강제 만료 처리. ID: {}", session.getId());
-            throw new CustomException(ErrorCode.SESSION_NOT_FOUND);
-        }
-
-        String userId = session.getUserId();
-        Long sessionId = session.getId();
-
-        // 4. 새 Refresh Token 생성 (Rotation) - 보안 강화
-        String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
-
-        // 5. DB에 새 Refresh Token 업데이트
-        sessionMapper.updateRefreshToken(sessionId, newRefreshToken);
-
-        // 6. 새 Access Token 발급
-        String newAccessToken = jwtTokenProvider.createAccessToken(userId, sessionId);
-
-        RefreshSessionRes response = RefreshSessionRes.builder()
-                    .accessToken(newAccessToken)
-                    .refreshToken(newRefreshToken)
-                    .build();
-        log.info("토큰 갱신 완료 (Rotation 적용) for userId={}, sessionId={}", userId, sessionId);
-
-        return response;
-    }
+    // NOTE: refreshToken 쿠키 제거로 refresh() 메서드 제거
+    // accessToken 만료 시 재로그인 필요
 
     /**
      * 내 기기 목록 조회
@@ -288,10 +241,5 @@ public class SessionService {
             log.error("ID 파싱 실패", e);
         }
         return null;
-    }
-
-    // keepLogin 조회
-    public Boolean getKeepLogin(Long sessionId) {
-        return sessionMapper.getKeepLoginBySessionId(sessionId);
     }
 }
