@@ -1,6 +1,6 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { showToast } from './Alert';
-import { logout } from './authUtility';
+import { logout, resetAuthCheck } from './authUtility';
 
 // ============================================
 // 토스트/리다이렉트 중복 방지 플래그
@@ -96,6 +96,11 @@ export const setupAxiosInterceptors = () => {
 
       // 401 Unauthorized
       if (status === 401) {
+        // public 엔드포인트의 401은 무시 (인증 확인 API 등)
+        if (isPublicEndpoint(url)) {
+          return Promise.reject(error);
+        }
+
         // 이미 로그아웃 처리 중이면 무시
         if (isLoggingOut) {
           return Promise.reject(error);
@@ -108,9 +113,12 @@ export const setupAxiosInterceptors = () => {
           showToast('세션이 만료되었습니다. 다시 로그인해주세요.', 'error');
         }
 
-        logout(undefined, true);
-        window.location.href = '/';
+        // 인증 확인 결과 리셋
+        resetAuthCheck();
 
+        // 로그아웃 처리 (skipApi=true로 중복 API 호출 방지)
+        logout(undefined, true);
+        
         // 5초 후 플래그 리셋 (이동 후 상태 정리)
         setTimeout(() => {
           isLoggingOut = false;
