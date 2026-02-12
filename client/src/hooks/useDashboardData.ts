@@ -6,13 +6,13 @@ import { chatApi, financeApi, memoApi, statsApi } from '../api/widgetApi';
 import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusMessage } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { logout, resetAuthCheck } from '../utils/authUtility';
+import { resetAuthCheck } from '../utils/authUtility';
 import { useAuth } from '../contexts/AuthContext';
 
 export const useDashboardData = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const myId = user?.id;
   
   // Context 사용

@@ -11,9 +11,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.demo.domain.user.entity.User;
 import com.example.demo.domain.user.mapper.UserMapper;
 import com.example.demo.global.security.JwtTokenProvider;
+import com.example.demo.global.util.CookieUtil;
 
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,6 +26,7 @@ public class AuthController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserMapper userMapper;
+    private final CookieUtil cookieUtil;
 
     /**
      * 인증 상태 확인 API
@@ -32,12 +34,17 @@ public class AuthController {
      * - 응답: { authenticated: true, user: { id, name } } 또는 401
      */
     @GetMapping("/check")
-    public ResponseEntity<?> checkAuthStatus(HttpServletRequest request) {
+    public ResponseEntity<?> checkAuthStatus(HttpServletRequest request, HttpServletResponse response) {
+        // https 여부 확인
+        boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
+
         // httpOnly 쿠키에서 accessToken 읽기
-        String token = extractTokenFromCookie(request);
+        String token = cookieUtil.extractTokenFromCookie(request, "accessToken");
 
         if (token == null) {
             log.debug("인증 확인 실패: 토큰이 쿠키에 없음");
+            // 인증 실패 시 쿠키 삭제
+            response.addHeader("Set-Cookie", cookieUtil.deleteCookie("accessToken", isHttps).toString());
             return ResponseEntity.status(401).body(Map.of("authenticated", false));
         }
 
@@ -47,6 +54,8 @@ public class AuthController {
             
             if (userId == null || userId.isEmpty()) {
                 log.debug("인증 확인 실패: userId가 토큰에 없음");
+                // 인증 실패 시 쿠키 삭제
+                response.addHeader("Set-Cookie", cookieUtil.deleteCookie("accessToken", isHttps).toString());
                 return ResponseEntity.status(401).body(Map.of("authenticated", false));
             }
 
@@ -55,38 +64,27 @@ public class AuthController {
             
             if (user == null) {
                 log.debug("인증 확인 실패: 사용자를 찾을 수 없음");
+                // 인증 실패 시 쿠키 삭제
+                response.addHeader("Set-Cookie", cookieUtil.deleteCookie("accessToken", isHttps).toString());
                 return ResponseEntity.status(401).body(Map.of("authenticated", false));
             }
 
             log.debug("인증 확인 성공: userId={}", userId);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("authenticated", true);
-            response.put("user", Map.of(
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("authenticated", true);
+            responseBody.put("user", Map.of(
                 "id", user.getId(),
                 "name", user.getName()
             ));
 
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(responseBody);
 
         } catch (Exception e) {
             log.error("인증 확인 중 오류 발생: {}", e.getMessage());
+            // 인증 실패 시 쿠키 삭제
+            response.addHeader("Set-Cookie", cookieUtil.deleteCookie("accessToken", isHttps).toString());
             return ResponseEntity.status(401).body(Map.of("authenticated", false));
         }
-    }
-
-    /**
-     * httpOnly 쿠키에서 accessToken 추출
-     */
-    private String extractTokenFromCookie(HttpServletRequest request) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies != null) {
-            for (Cookie cookie : cookies) {
-                if ("accessToken".equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-        return null;
     }
 }

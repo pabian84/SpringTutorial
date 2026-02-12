@@ -1,16 +1,9 @@
 // 인증 관련 유틸리티 (httpOnly 쿠키 기반)
 import axios from 'axios';
-import { showToast } from './Alert';
-import { userApi } from '../api/userApi';
-import { AUTH_CONSTANTS } from '../constants/auth';
 import { devError } from './logger';
 
-// 이벤트 리스너 키
-const LOGOUT_EVENT = 'authLogout';
-const LOGIN_EVENT = 'authLogin';
-
 // ============================================
-// 단일 인증 확인 (Singleton Pattern)
+// 인증 확인 (Singleton Pattern)
 // 중복 API 호출 방지
 // ============================================
 
@@ -77,76 +70,10 @@ export const resetAuthCheck = (): void => {
   authCheckResult = null;
 };
 
-// ============================================
-// 토큰 설정 (constants/auth.ts에서 수정)
-// 하위 호환성을 위해 유지
-// ============================================
-
-// 현재 설정값 가져오기
-export const getTokenExpirySeconds = (): number => {
-  return AUTH_CONSTANTS.IS_TEST_MODE
-    ? AUTH_CONSTANTS.TEST_TOKEN_EXPIRY
-    : AUTH_CONSTANTS.PROD_TOKEN_EXPIRY;
-};
-
-// ============================================
-// 이벤트 관련
-// ============================================
-
-export const emitLogoutEvent = (): void => {
-  window.dispatchEvent(new CustomEvent(LOGOUT_EVENT));
-};
-
-export const emitLoginEvent = (): void => {
-  window.dispatchEvent(new CustomEvent(LOGIN_EVENT));
-};
-
-// ============================================
-// 인증 상태 확인
-// ============================================
-
 /**
- * 인증 상태 확인
- * - 내부적으로 checkAuthStatus를 사용
+ * 인증 상태 확인 (간단한 버전)
  */
 export const isAuthenticated = async (): Promise<boolean> => {
   const result = await checkAuthStatus();
   return result.authenticated;
-};
-
-// ============================================
-// 로그아웃
-// ============================================
-
-export const logout = async (reason?: string, skipApi = false): Promise<void> => {
-  // 토스트 표시
-  if (reason) {
-    showToast(reason, 'error');
-  }
-
-  // 1. 인증 확인 결과 리셋
-  resetAuthCheck();
-
-  // 2. 로컬 스토리지 선택적 정리 (safeKeys 제외)
-  const safeKeys = ['theme', 'language', 'sidebarState'];
-  const allKeys = Object.keys(localStorage);
-
-  allKeys.forEach(key => {
-    if (!safeKeys.includes(key)) {
-      localStorage.removeItem(key);
-    }
-  });
-
-  // 3. 로그아웃 이벤트 발생 (WebSocket 정리 + 페이지 이동)
-  emitLogoutEvent();
-
-  // 4. 서버 로그아웃 API 호출
-  if (!skipApi) {
-    try {
-      // body에 userId를 전달하여 토큰 없이도 로그아웃 처리
-      await userApi.logout(undefined);
-    } catch (e) {
-      devError(e);
-    }
-  }
 };

@@ -1,19 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { WebSocketMessage, WebSocketSendMessage } from '../types/dtos';
 import { WebSocketContext, isWebSocketMessage } from './WebSocketContext';
-import { isAuthenticated } from '../utils/authUtility';
-import { useAuth } from './AuthContext';
+import { checkAuthStatus, isAuthenticated } from '../utils/authUtility';
 import { AUTH_CONSTANTS } from '../constants/auth';
 
 export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
-  const { user } = useAuth(); // 인증된 사용자 정보
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const isConnectingRef = useRef(false);
-  const isLoggedOutRef = useRef(false); // 로그아웃 후 재연결 방지
+  const isLoggedOutRef = useRef(true); // 로그아웃 후 재연결 방지
 
   // useCallback 참조 저장 (재귀 호출용)
   const connectSocketRef = useRef<(() => void) | null>(null);
@@ -28,13 +26,13 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     }
 
     // 인증 상태 확인 (비동기)
-    const isAuth = await isAuthenticated();
-    if (!isAuth) {
+    const authResult = await checkAuthStatus();
+    if (!authResult.authenticated) {
       return;
     }
 
-    // myId는 useAuth에서 가져옴 (localStorage 대신)
-    const myId = user?.id;
+    // myId는 checkAuthStatus에서 가져옴
+    const myId = authResult.user?.id;
     if (!myId) {
       // myId가 없으면 인증되지 않은 것으로 간주
       return;
@@ -114,7 +112,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     };
 
     socketRef.current = ws;
-  }, [WS_URL, user]);
+  }, [WS_URL]);
 
   // connectSocket 참조 저장
   useEffect(() => {
@@ -181,12 +179,9 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   }, []);
 
   const forceReconnect = useCallback(async () => {
-    // 로그아웃 후 재연결 방지
-    if (isLoggedOutRef.current) {
-      return;
-    }
-
     const isAuth = await isAuthenticated();
+    isLoggedOutRef.current = false;
+
     if (!isAuth) {
       return;
     }

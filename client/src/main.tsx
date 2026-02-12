@@ -3,18 +3,14 @@ import "cesium/Build/Cesium/Widgets/widgets.css";
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import 'react-grid-layout/css/styles.css';
+import { Toaster } from 'react-hot-toast';
 import 'react-resizable/css/styles.css';
 import { BrowserRouter } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
 import App from './App.tsx';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { CesiumCameraProvider } from './contexts/CesiumCameraProvider';
 import { UserLocationProvider } from './contexts/UserLocationProvider';
 import './index.css';
-import { setupAxiosInterceptors } from './utils/axiosConfig';
-import { ErrorBoundary } from './components/common/ErrorBoundary';
-
-// 앱 시작 시 Axios 인터셉터 설정 적용
-setupAxiosInterceptors();
 
 // 클라이언트 인스턴스 생성
 const queryClient = new QueryClient()

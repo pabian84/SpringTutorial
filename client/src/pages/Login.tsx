@@ -1,12 +1,6 @@
-import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { userApi } from '../api/userApi';
-import { showAlert, showToast } from '../utils/Alert';
 import { useAuth } from '../contexts/AuthContext';
-import { useWebSocket } from '../contexts/WebSocketContext';
-import { AUTH_CONSTANTS } from '../constants/auth';
-import { devError } from '../utils/logger';
 
 export default function Login() {
   // 개발용 기본값
@@ -14,10 +8,9 @@ export default function Login() {
   const [password, setPassword] = useState('1234');
   const [keepLogin, setKeepLogin] = useState(false);
   const navigate = useNavigate();
-  const { forceReconnect } = useWebSocket();
   const { isAuthenticated, login } = useAuth();
 
-  // 이미 인증되어 있으면 대시보드로 (App.tsx의 PublicRoute가 처리하지만 중첩 방지)
+  // 이미 인증되어 있으면 대시보드로
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/dashboard', { replace: true });
@@ -26,43 +19,7 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const data = await userApi.login(id, password, keepLogin);
-      const { user } = data;
-
-      if (user) {
-        // 토큰은 httpOnly 쿠키로 서버에서 설정됨
-        // 인증 컨텍스트 업데이트 (myId 설정 + 이벤트 발생)
-        login('httpOnlyCookie', user.id, user.name);
-
-        showToast(`환영합니다, ${user.name}님!`, 'success');
-
-        // WebSocket 강제 재연결 (쿠키 설정 후)
-        forceReconnect();
-
-        // Dashboard 마운트 완료 후 네비게이트
-        setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, AUTH_CONSTANTS.NAVIGATE_DELAY_LOGIN);
-      } else {
-        throw new Error("로그인 응답 데이터 오류");
-      }
-    } catch (e) {
-      devError(e);
-      let errorMessage = '로그인 중 오류가 발생했습니다.';
-
-      if (axios.isAxiosError(e)) {
-        if (e.response?.data && typeof e.response.data === 'string') {
-          errorMessage = e.response.data;
-        } else if (e.response?.status === 401) {
-          errorMessage = '아이디 또는 비밀번호를 확인해주세요.';
-        }
-      } else if (e instanceof Error) {
-        errorMessage = e.message;
-      }
-
-      showAlert('로그인 실패', errorMessage, 'error');
-    }
+    await login(id, password, keepLogin);
   };
 
   const styles = {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   FaArrowLeft,
   FaCheckCircle,
@@ -25,7 +25,7 @@ export default function DeviceManagement() {
   const [sessions, setSessions] = useState<DeviceSessionDTO[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
       const data = await sessionApi.getMySessions();
@@ -33,14 +33,15 @@ export default function DeviceManagement() {
     } catch (e) {
       console.error(e);
       showToast('기기 목록을 불러오지 못했습니다.', 'error');
+      navigate('/');
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     fetchSessions();
-  }, []);
+  }, [fetchSessions]);
 
   const handleLogoutOne = async (sessionId: number, isCurrent: boolean) => {
     const result = await showConfirm('로그아웃', '해당 기기의 접속을 해제하시겠습니까?');
@@ -86,6 +87,7 @@ export default function DeviceManagement() {
     } catch (e) {
       console.error(e);
       showToast('요청 실패', 'error');
+      navigate('/');
     }
   };
 

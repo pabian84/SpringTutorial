@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import type { SystemStatusDTO } from '../types/dtos';
+import type { SystemStatusMessage } from '../types/dtos';
 import { showToast } from '../utils/Alert';
 
 const MAX_DATA_POINTS = 20;
@@ -15,7 +15,7 @@ const INITIAL_DATA = Array(MAX_DATA_POINTS).fill({
 });
 
 interface ChartProps {
-  data: SystemStatusDTO[];
+  data: SystemStatusMessage[];
 }
 
 // 부모에게 데이터 받아서 렌더링 전용 컴포넌트
@@ -24,7 +24,7 @@ export default function ServerMonitor({ data }: ChartProps) {
 }
 
 export function StandaloneServerMonitor() {
-  const [systemData, setSystemData] = useState<SystemStatusDTO[]>(INITIAL_DATA);
+  const [systemData, setSystemData] = useState<SystemStatusMessage[]>(INITIAL_DATA);
   // new WebSocket() 대신 통합 훅 사용
   const { lastMessage } = useWebSocket();
   // 토스트 알림 쿨타임 관리용 Ref (재렌더링 없이 값 저장)
@@ -36,7 +36,7 @@ export function StandaloneServerMonitor() {
       // 1. 데이터 유효성 검사 (타입 가드)
       if (!lastMessage || lastMessage.type !== 'SYSTEM_STATUS') return;
 
-      const newData = lastMessage as SystemStatusDTO;
+      const newData = lastMessage as SystemStatusMessage;
       const timeStr = new Date().toLocaleTimeString('en-GB', {
         hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
       });

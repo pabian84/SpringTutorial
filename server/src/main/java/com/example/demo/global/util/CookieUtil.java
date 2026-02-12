@@ -7,6 +7,9 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+
 /**
  * 쿠키 및 WebSocket 유틸리티 클래스
  */
@@ -37,6 +40,24 @@ public class CookieUtil {
                     .sameSite(isHttps ? "None" : "Lax")
                     .maxAge(0)
                     .build();
+    }
+
+    /**
+     * httpOnly 쿠키에서 토큰 추출
+     * @param request HttpServletRequest
+     * @param cookieName 쿠키 이름
+     * @return 토큰 값 또는 null
+     */
+    public String extractTokenFromCookie(HttpServletRequest request, String cookieName) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (cookieName.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
 
     /**
