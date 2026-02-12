@@ -10,7 +10,7 @@ import ExchangeWidget from '../components/ExchangeWidget';
 import KakaoMapWidget from '../components/KakaoMapWidget';
 import MemoWidget from '../components/MemoWidget';
 import ServerMonitor from '../components/Servermonitor';
-import ThreeJsWidget from '../components/threejs/ThreeJsWidget'; // 위젯 임포트
+import ThreeJsWidget from '../components/threejs/ThreeJsWidget';
 import WeatherWidget from '../components/WeatherWidget';
 import { useUserLocation } from '../contexts/UserLocationContext';
 import { useDashboardData } from '../hooks/useDashboardData';
@@ -85,13 +85,13 @@ const defaultLayouts: RGL_Layouts = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  
+
   // [데이터 Hook] 비즈니스 로직 분리
-  const { 
-    myId, onlineUsers, exchangeData, codeData, memos, serverData, chatMessages, 
-    handleAddMemo, handleDeleteMemo, handleSendMessage, handleLogout 
+  const {
+    myId, onlineUsers, exchangeData, codeData, memos, serverData, chatMessages,
+    handleAddMemo, handleDeleteMemo, handleSendMessage, handleLogout
   } = useDashboardData();
-  
+
   const { lat, lon, loading: locLoading } = useUserLocation();
   // 지연 초기화 (Lazy Initialization)
   // 컴포넌트 최초 렌더링 시점에 LocalStorage를 동기적으로 읽어옵니다.
@@ -110,6 +110,44 @@ export default function Dashboard() {
   });
 
   const [isCompactMode, setIsCompactMode] = useState(false);
+
+  /**
+   * [네비게이션 핸들러]
+   * - 일반 클릭: 현재 탭에서 이동
+   * - 휠클릭 또는 Ctrl+Click: 새 탭에서 열기
+   */
+  const handleNavigate = useCallback((path: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    if (e.button === 1 || e.ctrlKey) {
+      e.preventDefault();
+      window.open(path, '_blank', 'noopener,noreferrer');
+    } else {
+      navigate(path);
+    }
+  }, [navigate]);
+
+  /**
+   * [타이틀 클릭 핸들러]
+   * 일반 클릭: 새로고침 / 휠클릭 또는 Ctrl+Click: 새 탭에서 열기
+   */
+  const handleTitleClick = (e: React.MouseEvent<HTMLHeadingElement>) => {
+    if (e.button === 1 || e.ctrlKey) {
+      e.preventDefault();
+      window.open('/', '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.reload();
+    }
+  };
+
+  /**
+   * [휠클릭 방지 핸들러]
+   * onMouseDown에서 button === 1(휠클릭)을 감지하고 preventDefault() 호출
+   */
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button === 1) {
+      e.preventDefault();
+    }
+  }, []);
+
   // [핸들러] 레이아웃 변경 시 LocalStorage에 저장
   const handleLayoutChange = useCallback((newLayouts: RGL_Layouts, breakpoint: string) => {
     devLog('Layout Changed:', breakpoint);
@@ -124,16 +162,27 @@ export default function Dashboard() {
    * useMemo를 통해 불필요한 설정 재생성을 방지하며, 각 위젯별 옵션을 정의합니다.
    */
   const widgets: WidgetConfig[] = useMemo(() => {
-    // 의존성 문제 해결을 위해 내부 정의
     // 세슘 상세 버튼
     const cesiumDetailButton = (
-      <button onClick={() => navigate('/cesium')} title="상세 보기" style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px', display: 'flex', transition: 'color 0.2s', marginRight: '5px' }}>
+      <button
+        onClick={(e) => handleNavigate('/cesium', e)}
+        onAuxClick={(e) => handleNavigate('/cesium', e)}
+        onMouseDown={handleMouseDown}
+        title="상세 보기 (휠클릭/ Ctrl+Click: 새 탭)"
+        style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px', display: 'flex', transition: 'color 0.2s', marginRight: '5px' }}
+      >
         <BiDetail size={20} />
       </button>
     );
     // ThreeJS 상세 버튼
     const threeDetailButton = (
-      <button onClick={() => navigate('/threejs')} title="상세 보기" style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px', display: 'flex', transition: 'color 0.2s', marginRight: '5px' }}>
+      <button
+        onClick={(e) => handleNavigate('/threejs', e)}
+        onAuxClick={(e) => handleNavigate('/threejs', e)}
+        onMouseDown={handleMouseDown}
+        title="상세 보기 (휠클릭/ Ctrl+Click: 새 탭)"
+        style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px', display: 'flex', transition: 'color 0.2s', marginRight: '5px' }}
+      >
         <BiDetail size={20} />
       </button>
     );
@@ -158,7 +207,15 @@ export default function Dashboard() {
                   <div style={{ fontWeight: 'bold' }}>{u.name}</div>
                   <div style={{ fontSize: '12px', color: '#777' }}>ID: {u.id}</div>
                 </div>
-                <button onClick={() => navigate(`/user/${u.id}`)} style={{ width: 'auto', padding: '5px 10px', fontSize: '12px', background: '#333' }}>Log</button>
+                <button
+                  onClick={(e) => handleNavigate(`/user/${u.id}`, e)}
+                  onAuxClick={(e) => handleNavigate(`/user/${u.id}`, e)}
+                  onMouseDown={handleMouseDown}
+                  title="상세 보기 (휠클릭/ Ctrl+Click: 새 탭)"
+                  style={{ width: 'auto', padding: '5px 10px', fontSize: '12px', background: '#333' }}
+                >
+                  Log
+                </button>
               </li>
             ))}
           </ul>
@@ -218,18 +275,17 @@ export default function Dashboard() {
       {
         id: 'three',
         title: '3D Robot Control',
-        icon: <FaCube style={{ color: '#d946ef' }} />, // 보라색/핑크색 계열
+        icon: <FaCube style={{ color: '#d946ef' }} />,
         content: <ThreeJsWidget />,
         headerAction: threeDetailButton,
-        // [중요] WebGL 컨텍스트 유지 및 애니메이션 끊김 방지
-        keepMounted: true, 
-        deferred: true, 
+        keepMounted: true,
+        deferred: true,
         idle: true
       },
     ];
   }, [
-    onlineUsers, locLoading, lat, lon, exchangeData, codeData, serverData, 
-    memos, chatMessages, myId, navigate,
+    onlineUsers, locLoading, lat, lon, exchangeData, codeData, serverData,
+    memos, chatMessages, myId, handleNavigate, handleMouseDown,
     handleAddMemo, handleDeleteMemo, handleSendMessage
   ]);
 
@@ -243,21 +299,31 @@ export default function Dashboard() {
     <div style={styles.container}>
       <header style={styles.header}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '24px' }}>Smart Dashboard</h1>
+          <h1
+            onClick={handleTitleClick}
+            onAuxClick={handleTitleClick}
+            onMouseDown={handleMouseDown}
+            style={{ margin: 0, fontSize: '24px', cursor: 'pointer' }}
+            title="대시보드"
+          >
+            Smart Dashboard
+          </h1>
           <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>Logged in as {myId}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button 
-            onClick={() => navigate('/devices')} 
-            style={{ 
-              width: 'auto', 
-              height: '75%', 
-              padding: '5px 10px', 
-              fontSize: '14px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              backgroundColor: '#214372', // 회색 계열 (구분감)
+          <button
+            onClick={(e) => handleNavigate('/devices', e)}
+            onAuxClick={(e) => handleNavigate('/devices', e)}
+            onMouseDown={handleMouseDown}
+            style={{
+              width: 'auto',
+              height: '75%',
+              padding: '5px 10px',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: '#214372',
             }}
             title="로그인된 기기 관리"
           >
@@ -267,9 +333,9 @@ export default function Dashboard() {
           <button onClick={handleLogout}
             style={{
               width: 'auto', height: '75%', padding: '5px 10px', fontSize: '14px',
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
             }}
           >
             <FaSignOutAlt size={16} />

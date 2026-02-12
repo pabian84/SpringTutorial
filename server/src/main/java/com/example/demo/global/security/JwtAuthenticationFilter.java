@@ -22,6 +22,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final SessionMapper sessionMapper; // DB 조회용
 
+    /**
+     * Login API는 토큰 확인 안 함 (토큰이 없거나 무효할 수 있음)
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return "/api/user/login".equals(request.getRequestURI());
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -37,7 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // [수정 핵심] 세션 ID가 없으면 -> 유령 토큰이므로 즉시 차단!
             if (sessionId == null) {
-                log.warn("차단됨: 세션 ID가 없는 토큰입니다. (구버전 토큰이거나 손상됨)");
+                log.warn("차단됨({}): 세션 ID가 없는 토큰입니다. (구버전 토큰이거나 손상됨)", request.getRequestURL());
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid Token: No Session ID");
                 return;
             }
@@ -45,7 +53,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (sessionMapper.findBySessionId(sessionId) == null) {
                 // DB에 없으면(로그아웃 당했으면) -> 인증 실패 처리!
                 // 아무것도 안 하고 리턴하면 401 뜸 (또는 response.sendError 사용)
-                log.warn("차단됨: DB에 없는 세션입니다. (이미 로그아웃됨) - ID: {}", sessionId);
+                log.warn("차단됨({}): DB에 없는 세션입니다. (이미 로그아웃됨) - ID: {}", request.getRequestURL(), sessionId);
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Session expired");
                 return; 
             }

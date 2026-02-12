@@ -12,7 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 export const useDashboardData = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const myId = user?.id;
   
   // Context 사용
@@ -29,7 +29,7 @@ export const useDashboardData = () => {
   const { data: onlineUsers = [] } = useQuery({
     queryKey: ['onlineUsers'], 
     queryFn: sessionApi.getOnlineUsers,
-    enabled: !!myId,
+    enabled: isAuthenticated,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
@@ -38,6 +38,7 @@ export const useDashboardData = () => {
     queryKey: ['exchangeData'],
     queryFn: financeApi.getExchangeRates,
     staleTime: 1000 * 60, // 1분 캐시
+    enabled: isAuthenticated,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
@@ -54,6 +55,7 @@ export const useDashboardData = () => {
       return chartData as CodeData[];
     },
     staleTime: 1000 * 60 * 10, // 10분 캐시
+    enabled: isAuthenticated,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
@@ -66,7 +68,7 @@ export const useDashboardData = () => {
       }
        return await memoApi.getMemos(myId);
     },
-    enabled: !!myId, 
+    enabled: isAuthenticated,
     refetchOnWindowFocus: false,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
@@ -121,7 +123,7 @@ export const useDashboardData = () => {
         return [];
       }
     },
-    enabled: !!myId, // myId가 있어야만 요청
+    enabled: isAuthenticated,
     refetchOnWindowFocus: false,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });

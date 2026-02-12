@@ -6,6 +6,7 @@ interface WebSocketContextType {
   lastMessage: WebSocketMessage | null;
   sendMessage: (message: WebSocketSendMessage) => void;
   forceReconnect: () => void;
+  forceDisconnect: () => void;
 }
 
 export const WebSocketContext = createContext<WebSocketContextType | null>(null);

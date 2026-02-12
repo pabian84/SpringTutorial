@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { checkAuthStatus, resetAuthCheck } from '../utils/authUtility';
 import { userApi } from '../api/userApi';
-import { setupAxiosInterceptors, resetLoggingOut } from '../utils/axiosConfig';
+import { setupAxiosInterceptors, setLoggingOut } from '../utils/axiosConfig';
 import { AuthContext } from './AuthContext';
 import { showAlert, showToast } from '../utils/Alert';
 import { devLog } from '../utils/logger';
@@ -16,12 +16,12 @@ interface UserInfo {
 }
 
 // Public Pages 목록 (인증 확인 건너뛰기)
-const PUBLIC_PAGES = ['/', '/weather'];
+const PUBLIC_PAGES = ['/weather'];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { forceReconnect } = useWebSocket();
+  const { forceReconnect, forceDisconnect } = useWebSocket();
   const mountedRef = useRef(true);
   
   // 인증 상태
@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (user) {
         // 로그아웃 상태 리셋
-        resetLoggingOut();
+        setLoggingOut(false);
         
         // 인증 확인 결과 리셋
         resetAuthCheck();
@@ -80,9 +80,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 로그아웃
   const logout = useCallback(async (reason?: string) => {
+    // 먼저 WebSocket 닫기 (Frontend에서 먼저 닫기)
+    forceDisconnect();
     // 토스트 표시
     if (reason) {
-      showToast(reason, 'error');
+      showToast(reason, 'warning');
     }
 
     // 로컬 상태 정리
@@ -113,9 +115,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 로그인 페이지로 이동
     navigate('/', { replace: true });
-
     devLog('[AuthProvider] 로그아웃 완료');
-  }, [navigate]);
+  }, [navigate, forceDisconnect]);
 
   // 외부에서 호출할 수 있는 logout (handleLogout)
   const handleLogout = useCallback((reason?: string) => {
@@ -135,11 +136,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     // Protected Pages: 인증 확인
     checkAuthStatus().then((result) => {
-      if (!result.authenticated) {
-        showToast('로그인이 필요합니다.', 'error');
-        resetAuthCheck();
-        navigate('/', { replace: true });
+      if (result.authenticated) {
+        return;
       }
+      if (location.pathname === '/') {
+        return;
+      }
+      showToast(`로그인이 필요합니다, ${location.pathname}`, 'error');
+      resetAuthCheck();
+      navigate('/', { replace: true });
     });
   }, [location.pathname, authState.loading, navigate]);
 
@@ -151,9 +156,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Axios interceptor 설정
     setupAxiosInterceptors({
-      onAuthFailed: (message: string) => {
+      onAuthFailed: (message: string, url: string) => {
         // 인증 실패 → 로그인 페이지로
-        handleLogout(message);
+        showToast(`인증실패(${message})(${url}), 로그아웃`);
+        handleLogout(message + url);
       },
       onAuthRestored: () => {
         // 인증 복구 → WebSocket 재연결

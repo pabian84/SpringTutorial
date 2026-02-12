@@ -3,6 +3,7 @@ import type { WebSocketMessage, WebSocketSendMessage } from '../types/dtos';
 import { WebSocketContext, isWebSocketMessage } from './WebSocketContext';
 import { checkAuthStatus, isAuthenticated } from '../utils/authUtility';
 import { AUTH_CONSTANTS } from '../constants/auth';
+import { devLog } from '../utils/logger';
 
 export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -11,7 +12,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const isConnectingRef = useRef(false);
-  const isLoggedOutRef = useRef(true); // 로그아웃 후 재연결 방지
+  const isLoggedOutRef = useRef(false); // 로그아웃 후 재연결 방지
 
   // useCallback 참조 저장 (재귀 호출용)
   const connectSocketRef = useRef<(() => void) | null>(null);
@@ -194,6 +195,23 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     }, AUTH_CONSTANTS.RECONNECT_DELAY_FORCE);
   }, [connectSocket]);
 
+  // 로그아웃 시 WebSocket 강제 종료
+  const forceDisconnect = useCallback(() => {
+    devLog('[WebSocketProvider] WebSocket 강제 종료');
+    isLoggedOutRef.current = true; // 재연결 방지
+
+    if (socketRef.current) {
+      socketRef.current.close();
+      socketRef.current = null;
+    }
+    setIsConnected(false);
+
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
   const sendMessage = useCallback((message: WebSocketSendMessage) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(message));
@@ -205,7 +223,8 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
       isConnected,
       lastMessage,
       sendMessage,
-      forceReconnect
+      forceReconnect,
+      forceDisconnect
     }}>
       {children}
     </WebSocketContext.Provider>

@@ -144,19 +144,19 @@ public class SessionService {
         webSocketHandler.broadcast(data);
     }
 
-    public void removeSession(WebSocketSession session) throws JsonProcessingException {
-        log.warn("removeSession 1");
-        String userId = getUserIdFromSession(session);
+    public void removeWebSocket(WebSocketSession session) throws JsonProcessingException {
+        log.warn("removeWebSocket 1");
+        String userId = getUserIdFromWebSocketSession(session);
         if (userId != null) {
-            log.warn("removeSession 2");
-            Set<WebSocketSession> userSessions = webSocketSessionsMap.get(userId);
-            if (userSessions != null) {
-                log.warn("removeSession 3");
+            log.warn("removeWebSocket 2");
+            Set<WebSocketSession> webSocketSessions = webSocketSessionsMap.get(userId);
+            if (webSocketSessions != null) {
+                log.warn("removeWebSocket 3");
                 // 목록에서 제거
-                userSessions.remove(session);
-                // 더 이상 남은 세션이 없으면 오프라인 처리
-                if (userSessions.isEmpty()) {
-                    log.warn("removeSession 4");
+                webSocketSessions.remove(session);
+                // 더 이상 남은 웹소켓이 없으면 오프라인 처리
+                if (webSocketSessions.isEmpty()) {
+                    log.warn("removeWebSocket 4");
                     webSocketSessionsMap.remove(userId);
                     userService.updateUserStatus(userId, false); // DB Offline 처리
 
@@ -166,24 +166,24 @@ public class SessionService {
 
                     webSocketHandler.broadcast(data);
                 } else {
-                    log.warn("removeSession 5");
+                    log.warn("removeWebSocket 5");
                 }
             }
         }
     }
 
     // [1] 특정 기기 하나만 로그아웃
-    public void forceDisconnectOne(String userId, Long targetSessionId) {
-        Set<WebSocketSession> sessions = webSocketSessionsMap.get(userId);
-        if (sessions == null) return;
+    public void forceDisconnectWebSocket(String userId, Long targetSessionId) {
+        Set<WebSocketSession> webSocketSessions = webSocketSessionsMap.get(userId);
+        if (webSocketSessions == null) return;
 
-        for (WebSocketSession session : sessions) {
-            Long sId = (Long) session.getAttributes().get("sessionId");
+        for (WebSocketSession webSocket : webSocketSessions) {
+            Long sId = (Long) webSocket.getAttributes().get("sessionId");
             // 세션 ID가 일치하는 놈만 연결 끊기
             if (sId != null && sId.equals(targetSessionId)) {
                 try {
-                    log.warn("특정 기기 세션 종료: User={}, Session={}", userId, targetSessionId);
-                    session.close(new CloseStatus(4001, "Force Logout by Admin"));
+                    log.warn("특정 기기 웹소켓 종료: UserId={}, SessionId={}", userId, targetSessionId);
+                    webSocket.close(new CloseStatus(4001, "Force Logout by Admin"));
                 } catch (Exception e) {
                     log.error("소켓 강제 종료 중 에러", e);
                 }
@@ -191,18 +191,44 @@ public class SessionService {
         }
     }
 
+    /**
+     * 특정 sessionId로 WebSocket 강제 종료
+     * (sessionId 기반으로 정확한 세션만 끊음)
+     */
+    public void forceDisconnectWebSocket(Long sessionId) {
+        // 현재 접속 중인 모든 세션에서 해당 sessionId 찾기
+        for (Map.Entry<String, Set<WebSocketSession>> entry : webSocketSessionsMap.entrySet()) {
+            String userId = entry.getKey();
+            Set<WebSocketSession> webSocketSessions = entry.getValue();
+            
+            for (WebSocketSession webSocket : webSocketSessions) {
+                Long sId = (Long) webSocket.getAttributes().get("sessionId");
+                if (sId != null && sId.equals(sessionId)) {
+                    try {
+                        log.info("WebSocket 강제 종료: UserId={}, SessionId={}", userId, sessionId);
+                        webSocket.close(new CloseStatus(4001, "Logout"));
+                    } catch (Exception e) {
+                        log.error("WebSocket 종료 중 에러", e);
+                    }
+                    return; // 하나 찾으면 종료
+                }
+            }
+        }
+        log.debug("WebSocket 세션 찾기 실패: sessionId={}", sessionId);
+    }
+
     // [2] 나 빼고 나머지 다 로그아웃
     public void forceDisconnectOthers(String userId, Long mySessionId) {
-        Set<WebSocketSession> sessions = webSocketSessionsMap.get(userId);
-        if (sessions == null) return;
+        Set<WebSocketSession> webSocketSessions = webSocketSessionsMap.get(userId);
+        if (webSocketSessions == null) return;
 
-        for (WebSocketSession session : sessions) {
-            Long sId = (Long) session.getAttributes().get("sessionId");
-            // 내 세션 ID가 아니면 다 끊어!
+        for (WebSocketSession webSocket : webSocketSessions) {
+            Long sId = (Long) webSocket.getAttributes().get("sessionId");
+            // 내 세션 ID가 아니면 끊기
             if (sId != null && !sId.equals(mySessionId)) {
                 try {
-                    log.warn("다른 기기 강제 추방: User={}, Session={}", userId, sId);
-                    session.close(new CloseStatus(4001, "Force Logout Others"));
+                    log.warn("다른 기기 강제 추방: UserId={}, SessionId={}", userId, sId);
+                    webSocket.close(new CloseStatus(4001, "Force Logout Others"));
                 } catch (Exception e) {
                     log.error("소켓 강제 종료 중 에러", e);
                 }
@@ -212,11 +238,11 @@ public class SessionService {
     
     // [3] 전부 다 로그아웃
     public void forceDisconnectAll(String userId) {
-        Set<WebSocketSession> sessions = webSocketSessionsMap.get(userId);
-        if (sessions != null) {
-            for (WebSocketSession session : sessions) {
+        Set<WebSocketSession> webSocketSessions = webSocketSessionsMap.get(userId);
+        if (webSocketSessions != null) {
+            for (WebSocketSession webSocket : webSocketSessions) {
                 try {
-                    session.close(new CloseStatus(4001, "Force Logout All"));
+                    webSocket.close(new CloseStatus(4001, "Force Logout All"));
                 } catch (Exception e) {
                     log.error("소켓 강제 종료 중 에러", e);
                 }
@@ -225,7 +251,7 @@ public class SessionService {
     }
 
     // HTTP attributes 또는 URL 파라미터에서 userId 추출 (공용 CookieUtil.getUserIdFromSession 사용)
-    private String getUserIdFromSession(WebSocketSession session) {
+    private String getUserIdFromWebSocketSession(WebSocketSession session) {
         return CookieUtil.getUserIdFromSession(session);
     }
 }

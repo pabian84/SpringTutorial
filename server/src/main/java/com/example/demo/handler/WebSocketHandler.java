@@ -99,7 +99,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         sessions.remove(session);
         // 사용자 세션 관리
-        sessionService.removeSession(session);
+        sessionService.removeWebSocket(session);
         log.info("통합 소켓 종료: {}", session.getId());
     }
 

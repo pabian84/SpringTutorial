@@ -101,11 +101,13 @@ public class UserController {
             // sessionId가 있으면 해당 세션만, 없으면 전체 로그아웃
             if (sessionId != null) {
                 userService.logout(userId, sessionId, userAgent, ipAddress);
-                sessionService.forceDisconnectOne(userId, sessionId);
+                sessionService.forceDisconnectWebSocket(userId, sessionId);
+                log.warn("로그아웃 완료: userId={}, sessionId={}", userId, sessionId);
             } else {
-                // 토큰이 없거나 만료된 경우: 사용자의 모든 세션 삭제
-                userService.logoutAll(userId, userAgent, ipAddress);
-                sessionService.forceDisconnectAll(userId);
+                // ⚠️ sessionId가 없는 경우 (토큰 없음/만료)
+                // 전체 삭제하지 않음!
+                log.warn("로그아웃 요청: sessionId 없음, userId={}", userId);
+                // ⚠️ WebSocket은 Backend에서 끊지 않음 (sessionId를 모르니까)
             }
         }
         

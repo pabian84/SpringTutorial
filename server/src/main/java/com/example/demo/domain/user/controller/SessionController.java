@@ -60,7 +60,7 @@ public class SessionController {
             sessionService.deleteSession(targetSessionId, currentSessionId);
 
             // 소켓 끊기 (이건 Presentation Layer인 컨트롤러가 Handler를 호출하는 게 맞음)
-            sessionService.forceDisconnectOne(currentUserId, targetSessionId);
+            sessionService.forceDisconnectWebSocket(currentUserId, targetSessionId);
 
             return ResponseEntity.ok("선택한 기기를 로그아웃 시켰습니다.");
         } catch (IllegalArgumentException e) {

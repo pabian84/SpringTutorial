@@ -18,11 +18,9 @@ const authRetryQueue: RetryRequest[] = [];
 // ============================================
 let isProcessingError = false;  // 인증 에러 처리 중복 방지
 let isLoggingOut = false;        // 로그아웃 중복 방지
-
-// 로그아웃 상태 리셋 (재로그인 시 호출)
-export const resetLoggingOut = () => {
-  isLoggingOut = false;
-};
+// logout 상태를 외부에서 설정하기 위한 함수
+export const setLoggingOut = (value : boolean) => isLoggingOut = value;
+export const getLoggingOut = () => isLoggingOut;
 
 // ============================================
 // public 엔드포인트 확인
@@ -47,11 +45,12 @@ interface AuthErrorConfig {
   status: number;
   errorCode?: string;
   message: string;
+  url: string;
 }
 
 const handleAuthError = async (
   errorConfig: AuthErrorConfig,
-  onAuthFailed: (message: string) => void,
+  onAuthFailed: (message: string, url: string) => void,
   onAuthRestored: () => void
 ): Promise<boolean> => {
   // 이미 처리 중이면 중복 방지
@@ -100,7 +99,7 @@ const handleAuthError = async (
       });
       authRetryQueue.length = 0;
       
-      onAuthFailed(errorConfig.message);
+      onAuthFailed(errorConfig.message, errorConfig.url);
     }
     isProcessingError = false;
   }
@@ -113,7 +112,7 @@ const handleAuthError = async (
 // ============================================
 
 interface InterceptorCallbacks {
-  onAuthFailed: (message: string) => void;  // 인증 실패 (로그인 페이지로)
+  onAuthFailed: (message: string, url: string) => void;  // 인증 실패 (로그인 페이지로)
   onAuthRestored: () => void;                 // 인증 복구 (재연결 등)
 }
 
@@ -189,7 +188,7 @@ export const setupAxiosInterceptors = (callbacks: InterceptorCallbacks) => {
       // ------------------------------------------
       if (status === 401) {
         const handled = await handleAuthError(
-          { status: 401, message: '세션이 만료되었습니다.' },
+          { status: 401, message: '세션이 만료되었습니다.', url: url },
           onAuthFailed,
           onAuthRestored
         );
@@ -206,7 +205,7 @@ export const setupAxiosInterceptors = (callbacks: InterceptorCallbacks) => {
       // ------------------------------------------
       if (status === 403 && errorCode !== 'A006') {
         const handled = await handleAuthError(
-          { status: 403, errorCode, message: '접근이 거부되었습니다.' },
+          { status: 403, errorCode, message: '접근이 거부되었습니다.', url: url },
           onAuthFailed,
           onAuthRestored
         );
