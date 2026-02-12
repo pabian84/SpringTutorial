@@ -84,24 +84,22 @@ const handleAuthError = async (
       onAuthRestored();  // WebSocket 재연결 등
       return true;
     } else {
-      //showToast(errorConfig.message, 'error');
-      
       // 인증 FAIL → 로그아웃 처리
       resetAuthCheck();
       isLoggingOut = true;
-      // 큐에 있는 요청들 모두 실패 처리
+    }
+  } catch {
+    isLoggingOut = true;
+  } finally {
+    // 로그아웃 처리 시 큐 비우기
+    if (isLoggingOut) {
       const errorMessage = errorConfig.status === 401 ? 'Session expired' : 
                            errorConfig.status === 403 ? 'Access denied' : 'Not found';
       authRetryQueue.forEach(({ reject }) => {
         reject(new Error(errorMessage));
       });
       authRetryQueue.length = 0;
-    }
-  } catch {
-    isLoggingOut = true;
-  } finally {
-    // 인증 FAIL 시에만 onAuthFailed() 호출 (중복 방지)
-    if (isLoggingOut) {
+      
       onAuthFailed(errorConfig.message);
     }
     isProcessingError = false;
@@ -221,19 +219,12 @@ export const setupAxiosInterceptors = (callbacks: InterceptorCallbacks) => {
       }
 
       // ------------------------------------------
-      // 404 Not Found (S001 에러코드 제외)
+      // 404 Not Found (자원 문제)
       // ------------------------------------------
-      if (status === 404 && errorCode !== 'S001') {
-        const handled = await handleAuthError(
-          { status: 404, errorCode, message: '페이지를 찾을 수 없습니다.' },
-          onAuthFailed,
-          onAuthRestored
-        );
-
-        if (handled) {
-          return axios(config);
-        }
-
+      if (status === 404) {
+        // S001은 이제 401이므로 404에서는 제외
+        // 404는 자원 문제이므로 토스트만 표시
+        showToast('데이터를 찾을 수 없습니다.', 'info');
         return Promise.reject(error);
       }
 

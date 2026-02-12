@@ -48,7 +48,7 @@ jwt:
   # 환경 변수: JWT_ACCESS_TOKEN_EXPIRY
   # 개발: 15 (15초 - 빠른 테스트)
   # 운영: 1800 (30분)
-  access-token-validity-in-seconds: "${JWT_ACCESS_TOKEN_EXPIRY:15}"
+  access-token-validity-in-seconds: "${JWT_ACCESS_TOKEN_EXPIRY:1800}"
   
   # 리프레시 토큰 만료 (7일 = 604800초)
   # 환경 변수: JWT_REFRESH_TOKEN_EXPIRY

@@ -185,7 +185,7 @@ export const useDashboardData = () => {
 
   // === [로그아웃 - 중앙화된 authUtility 사용] ===
   const handleLogout = async () => {
-    await logout('사용자 로그아웃');
+    logout('사용자 로그아웃');
   };
 
   return {

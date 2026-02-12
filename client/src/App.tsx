@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import ThreeJsDetail from './pages/ThreeJsDetail';
 import UserDetail from './pages/UserDetail';
 import WeatherDetail from './pages/WeatherDetail';
+import NotFound from './pages/NotFound';
 import './styles/toast.css';
 
 // Protected Route - Outlet 패턴 사용 (로딩 상태 포함)
@@ -86,6 +87,7 @@ function AppContent() {
         <Route path="/cesium" element={<CesiumDetail />} />
         <Route path="/threejs" element={<ThreeJsDetail />} />
         <Route path="/devices" element={<ProtectedRoute children={<DeviceManagement />} />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );
