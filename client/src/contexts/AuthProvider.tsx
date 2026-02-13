@@ -7,6 +7,7 @@ import { AuthContext } from './AuthContext';
 import { showAlert, showToast } from '../utils/Alert';
 import { devLog } from '../utils/logger';
 import { AUTH_CONSTANTS } from '../constants/auth';
+import { isAuthenticatedRef } from '../constants/authRef';
 import { useWebSocket } from './WebSocketContext';
 
 // 사용자 정보 타입
@@ -54,6 +55,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           user: { id: user.id, name: user.name },
           loading: false,
         });
+        
+        // isAuthenticatedRef도 true로 설정 (React Query용)
+        isAuthenticatedRef.current = true;
 
         showToast(`환영합니다, ${user.name}님!`, 'success');
         devLog('[AuthProvider] 로그인 완료:', user.id);
@@ -82,11 +86,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async (reason?: string) => {
     // 먼저 WebSocket 닫기 (Frontend에서 먼저 닫기)
     forceDisconnect();
+    
+    // 서버 로그아웃 API 호출
+    try {
+      await userApi.logout(undefined);
+    } catch (e) {
+      devLog('[AuthProvider] 로그아웃 API 오류:', e);
+    }
+    
     // 토스트 표시
     if (reason) {
       showToast(reason, 'warning');
     }
 
+    // 먼저 isAuthenticatedRef를 false로 설정 (React Query 비활성화)
+    isAuthenticatedRef.current = false;
+    
     // 로컬 상태 정리
     setAuthState({
       authenticated: false,
@@ -106,17 +121,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // 서버 로그아웃 API 호출
-    try {
-      await userApi.logout(undefined);
-    } catch (e) {
-      devLog('[AuthProvider] 로그아웃 API 오류:', e);
-    }
-
-    // 로그인 페이지로 이동
-    navigate('/', { replace: true });
+    // navigate는 useEffect에서 처리함
     devLog('[AuthProvider] 로그아웃 완료');
-  }, [navigate, forceDisconnect]);
+  }, [forceDisconnect]);
 
   // 외부에서 호출할 수 있는 logout (handleLogout)
   const handleLogout = useCallback((reason?: string) => {
@@ -159,7 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       onAuthFailed: (message: string, url: string) => {
         // 인증 실패 → 로그인 페이지로
         showToast(`인증실패(${message})(${url}), 로그아웃`);
-        handleLogout(message + url);
+        //handleLogout(message + url);
       },
       onAuthRestored: () => {
         // 인증 복구 → WebSocket 재연결
@@ -177,6 +184,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     checkAuthStatus().then((result) => {
       if (mounted) {
+        // isAuthenticatedRef도同步 설정 (React Query용)
+        isAuthenticatedRef.current = result.authenticated;
+        
         setAuthState({
           authenticated: result.authenticated,
           user: result.user || null,
@@ -190,6 +200,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mounted = false;
     };
   }, [handleLogout, forceReconnect, location.pathname]);
+
+  // ------------------------------------------
+  // 인증 상태 변경 감지 → 로그인 페이지로 이동
+  // ------------------------------------------
+  useEffect(() => {
+    // 로딩 중이거나 '/'이면 실행 안 함
+    if (authState.loading || location.pathname === '/') return;
+    
+    // authenticated가 false로 변경되었을 때 navigate
+    if (!authState.authenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [authState.authenticated, authState.loading, location.pathname, navigate]);
 
   // ------------------------------------------
   // 인증 확인 함수 (필요시 호출)

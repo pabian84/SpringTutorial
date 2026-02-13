@@ -8,11 +8,12 @@ import { showConfirm, showToast } from '../utils/Alert';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { resetAuthCheck } from '../utils/authUtility';
 import { useAuth } from '../contexts/AuthContext';
+import { isAuthenticatedRef } from '../constants/authRef';
 
 export const useDashboardData = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, logout } = useAuth();
   const myId = user?.id;
   
   // Context 사용
@@ -23,13 +24,13 @@ export const useDashboardData = () => {
   const [serverData, setServerData] = useState<SystemStatusMessage[]>([]);
   
   // 주의: ProtectedRoute에서 이미 인증을 체크하므로 여기서는 중복 체크하지 않음
-  // myId가 없으면 API 호출이 enabled=false로 막히므로 안전함
+  // isAuthenticatedRef.current가 없으면 API 호출이 enabled=false로 막히므로 안전함
 
   // 2. 접속자 리스트 (React Query)
   const { data: onlineUsers = [] } = useQuery({
     queryKey: ['onlineUsers'], 
     queryFn: sessionApi.getOnlineUsers,
-    enabled: isAuthenticated,
+    enabled: isAuthenticatedRef.current,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
@@ -38,7 +39,7 @@ export const useDashboardData = () => {
     queryKey: ['exchangeData'],
     queryFn: financeApi.getExchangeRates,
     staleTime: 1000 * 60, // 1분 캐시
-    enabled: isAuthenticated,
+    enabled: isAuthenticatedRef.current,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
@@ -55,7 +56,7 @@ export const useDashboardData = () => {
       return chartData as CodeData[];
     },
     staleTime: 1000 * 60 * 10, // 10분 캐시
-    enabled: isAuthenticated,
+    enabled: isAuthenticatedRef.current,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
@@ -68,7 +69,7 @@ export const useDashboardData = () => {
       }
        return await memoApi.getMemos(myId);
     },
-    enabled: isAuthenticated,
+    enabled: isAuthenticatedRef.current,
     refetchOnWindowFocus: false,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
@@ -123,7 +124,7 @@ export const useDashboardData = () => {
         return [];
       }
     },
-    enabled: isAuthenticated,
+    enabled: isAuthenticatedRef.current,
     refetchOnWindowFocus: false,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
