@@ -82,32 +82,49 @@ public class UserController {
         Long sessionId = null;
         String token = jwtTokenProvider.resolveToken(request);
         
-        // body에서 userId 우선 사용 (토큰 만료 시)
+        // body에서 userId 우선 사용 (토큰 만료 시 프론트엔드에서 전달)
         if (body != null && body.containsKey("userId")) {
             userId = body.get("userId");
         }
         
-        // 토큰이 유효하면 sessionId 추출
-        if (token != null && jwtTokenProvider.validateToken(token)) {
-            sessionId = jwtTokenProvider.getSessionId(token);
-            if (userId == null) {
-                userId = jwtTokenProvider.getAuthentication(token).getName();
+        // 토큰이 있으면 sessionId와 userId 추출 시도
+        if (token != null) {
+            // 1. 유효한 토큰에서 추출
+            if (jwtTokenProvider.validateToken(token)) {
+                sessionId = jwtTokenProvider.getSessionId(token);
+                if (userId == null) {
+                    userId = jwtTokenProvider.getAuthentication(token).getName();
+                }
+            } 
+            // 2. 만료된 토큰에서도 sessionId 추출 시도 (로그아웃 처리용)
+            else {
+                Long expiredSessionId = jwtTokenProvider.getSessionIdFromExpiredToken(token);
+                String expiredUserId = jwtTokenProvider.getUserIdFromExpiredToken(token);
+                
+                if (expiredSessionId != null) {
+                    sessionId = expiredSessionId;
+                    log.debug("만료된 토큰에서 sessionId 추출: {}", sessionId);
+                }
+                if (userId == null && expiredUserId != null) {
+                    userId = expiredUserId;
+                    log.debug("만료된 토큰에서 userId 추출: {}", userId);
+                }
             }
         }
         
         if (userId != null) {
             String userAgent = request.getHeader("User-Agent");
             String ipAddress = request.getRemoteAddr();
-            // sessionId가 있으면 해당 세션만, 없으면 전체 로그아웃
+            
+            // sessionId가 있으면 해당 세션만 로그아웃
             if (sessionId != null) {
                 userService.logout(userId, sessionId, userAgent, ipAddress);
                 sessionService.forceDisconnectWebSocket(userId, sessionId);
-                log.warn("로그아웃 완료: userId={}, sessionId={}", userId, sessionId);
+                log.info("로그아웃 완료: userId={}, sessionId={}", userId, sessionId);
             } else {
-                // ⚠️ sessionId가 없는 경우 (토큰 없음/만료)
-                // 전체 삭제하지 않음!
-                log.warn("로그아웃 요청: sessionId 없음, userId={}", userId);
-                // ⚠️ WebSocket은 Backend에서 끊지 않음 (sessionId를 모르니까)
+                // sessionId를 추출할 수 없는 경우 (토큰 자체가 없거나 손상됨)
+                // 여러 기기 동시 접속 지원을 위해 전체 삭제하지 않음
+                log.warn("로그아웃 요청: sessionId 추출 실패, userId={}", userId);
             }
         }
         
