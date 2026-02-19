@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { checkAuthStatus, resetAuthCheck } from '../utils/authUtility';
+import { checkAuthStatus, resetAuthCheck, setIsLoggingIn, setIsLoggingOut, getIsLoggingOut } from '../utils/authUtility';
 import { userApi } from '../api/userApi';
-import { setupAxiosInterceptors, setLoggingOut } from '../utils/axiosConfig';
+import { setupAxiosInterceptors } from '../utils/axiosConfig';
 import { AuthContext } from './AuthContext';
 import { showAlert, showToast } from '../utils/Alert';
 import { devLog } from '../utils/logger';
@@ -38,13 +38,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 로그인
   const login = useCallback(async (id: string, password: string, keepLogin: boolean) => {
+    // 로그인 시작 플래그 설정
+    setIsLoggingIn(true);
+    
     try {
       const data = await userApi.login(id, password, keepLogin);
       const { user } = data;
 
       if (user) {
         // 로그아웃 상태 리셋
-        setLoggingOut(false);
+        setIsLoggingOut(false);
         
         // 인증 확인 결과 리셋
         resetAuthCheck();
@@ -79,19 +82,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         errorMessage = e.message;
       }
       showAlert('로그인 실패', errorMessage, 'error');
+    } finally {
+      // 로그인 종료 플래그 해제
+      setIsLoggingIn(false);
     }
   }, [navigate, forceReconnect]);
 
   // 로그아웃
-  const logout = useCallback(async (reason?: string) => {
+  const logout = useCallback(async (reason?: string, force: boolean = false) => {
+    // 이미 로그아웃 중이면 중복 실행 방지 (강제 실행 제외)
+    if (!force && getIsLoggingOut()) {
+      return;
+    }
+    
+    // 로그아웃 시작 플래그 설정
+    setIsLoggingOut(true);
+    
     // 먼저 WebSocket 닫기 (Frontend에서 먼저 닫기)
     forceDisconnect();
     
-    // 서버 로그아웃 API 호출
-    try {
-      await userApi.logout(undefined);
-    } catch (e) {
-      devLog('[AuthProvider] 로그아웃 API 오류:', e);
+    // 서버 로그아웃 API 호출 (강제 실행이 아닐 때만)
+    if (!force) {
+      try {
+        await userApi.logout(undefined);
+      } catch (e) {
+        devLog('[AuthProvider] 로그아웃 API 오류:', e);
+      }
     }
     
     // 토스트 표시
@@ -126,47 +142,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [forceDisconnect]);
 
   // 외부에서 호출할 수 있는 logout (handleLogout)
-  const handleLogout = useCallback((reason?: string) => {
-    logout(reason);
+  const handleLogout = useCallback((reason?: string, force: boolean = false) => {
+    logout(reason, force);
   }, [logout]);
 
   // ------------------------------------------
-  // 경로 변경 시 인증 확인 (Protected Pages만)
-  // ------------------------------------------
-  useEffect(() => {
-    // 마운트 완료 후에만 실행
-    if (authState.loading) return;
-
-    // Public Pages는 인증 확인 건너뛰기
-    if (PUBLIC_PAGES.some(page => location.pathname === page)) {
-      return;
-    }
-    // Protected Pages: 인증 확인
-    checkAuthStatus().then((result) => {
-      if (result.authenticated) {
-        return;
-      }
-      if (location.pathname === '/') {
-        return;
-      }
-      showToast(`로그인이 필요합니다, ${location.pathname}`, 'error');
-      resetAuthCheck();
-      navigate('/', { replace: true });
-    });
-  }, [location.pathname, authState.loading, navigate]);
-
-  // ------------------------------------------
   // 마운트 시 인증 상태 확인 + Axios interceptor 설정
+  // 주의: 경로 변경 시 인증 확인은 제거됨
+  // 이유: axios interceptor가 401을 처리하므로 중복 방지
   // ------------------------------------------
   useEffect(() => {
     let mounted = true;
 
     // Axios interceptor 설정
     setupAxiosInterceptors({
-      onAuthFailed: (message: string, url: string) => {
-        // 인증 실패 → 로그인 페이지로
-        showToast(`인증실패(${message})(${url}), 로그아웃`);
-        //handleLogout(message + url);
+      onAuthFailed: (message: string) => {
+        // 인증 실패 → 로그아웃 처리
+        handleLogout(message);
       },
       onAuthRestored: () => {
         // 인증 복구 → WebSocket 재연결

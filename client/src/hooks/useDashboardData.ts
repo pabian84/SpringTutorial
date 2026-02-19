@@ -6,7 +6,7 @@ import { chatApi, financeApi, memoApi, statsApi } from '../api/widgetApi';
 import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusMessage } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { resetAuthCheck } from '../utils/authUtility';
+
 import { useAuth } from '../contexts/AuthContext';
 import { isAuthenticatedRef } from '../constants/authRef';
 
@@ -169,11 +169,9 @@ export const useDashboardData = () => {
         break;
 
       case 'FORCE_LOGOUT':
-        showToast('다른 기기에서 접속하여 로그아웃되었습니다.', 'error');
-        // 인증 확인 결과 리셋
-        resetAuthCheck();
-        // AuthProvider의 상태도 정리되어야 함 (logout 호출)
-        navigate('/');
+        // 다른 기기에서 접속하여 강제 로그아웃됨
+        // logout() 호출로 서버 세션 정리 및 상태 초기화
+        logout('다른 기기에서 접속하여 로그아웃되었습니다.');
         break;
     }
   }, [lastMessage, queryClient, navigate]);

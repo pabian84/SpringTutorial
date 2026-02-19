@@ -61,6 +61,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 통과되면 인증 정보 설정 (기존)
             Authentication auth = jwtTokenProvider.getAuthentication(token);
             SecurityContextHolder.getContext().setAuthentication(auth); // "통과!"
+            
+            // 마지막 접속 시간 업데이트 (세션 활동 추적)
+            sessionMapper.updateLastAccessedAt(sessionId);
         }
 
         // 3. 다음 단계로 진행

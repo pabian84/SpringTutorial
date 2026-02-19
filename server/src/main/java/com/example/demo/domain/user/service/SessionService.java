@@ -13,10 +13,12 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import com.example.demo.domain.user.dto.UserRes;
 import com.example.demo.domain.user.entity.Session;
+import com.example.demo.domain.user.event.NewDeviceLoginEvent;
 import com.example.demo.domain.user.mapper.SessionMapper;
 import com.example.demo.domain.user.mapper.UserMapper;
 import com.example.demo.global.constant.SecurityConstants;
@@ -26,6 +28,7 @@ import com.example.demo.global.security.JwtTokenProvider;
 import com.example.demo.global.util.CookieUtil;
 import com.example.demo.handler.WebSocketHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -253,5 +256,67 @@ public class SessionService {
     // HTTP attributes 또는 URL 파라미터에서 userId 추출 (공용 CookieUtil.getUserIdFromSession 사용)
     private String getUserIdFromWebSocketSession(WebSocketSession session) {
         return CookieUtil.getUserIdFromSession(session);
+    }
+
+    /**
+     * 새 기기 로그인 이벤트 수신 및 알림 전송
+     * UserService에서 발행한 이벤트를 수신하여 기존 기기에 알림 전송
+     * 
+     * @TransactionalEventListener 사용 이유:
+     * - UserService.login()이 @Transactional로 실행됨
+     * - 트랜잭션이 커밋된 후에 이벤트를 처리해야 DB에 저장된 세션 정보가 유효함
+     * - BEFORE_COMMIT: 커밋 전 실행 (기본값)
+     * - AFTER_COMMIT: 커밋 후 실행 (권장)
+     */
+    @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT)
+    public void handleNewDeviceLoginEvent(NewDeviceLoginEvent event) {
+        String userId = event.getUserId();
+        Long newSessionId = event.getNewSessionId();
+        String deviceType = event.getDeviceType();
+        String ipAddress = event.getIpAddress();
+        
+        log.info("[이벤트 수신] 새 기기 로그인: userId={}, newSessionId={}, device={}", userId, newSessionId, deviceType);
+        
+        Set<WebSocketSession> webSocketSessions = webSocketSessionsMap.get(userId);
+        log.info("[알림 전송] userId={}, WebSocket 세션 수={}, excludeSessionId={}", 
+                 userId, webSocketSessions != null ? webSocketSessions.size() : 0, newSessionId);
+        
+        if (webSocketSessions == null) {
+            log.warn("[알림 전송 실패] WebSocket 세션 없음 (userId={})", userId);
+            return;
+        }
+
+        // 알림 메시지 생성
+        Map<String, Object> notification = new HashMap<>();
+        notification.put("type", "NEW_DEVICE_LOGIN");
+        notification.put("deviceType", deviceType);
+        notification.put("ipAddress", ipAddress);
+        notification.put("timestamp", System.currentTimeMillis());
+        notification.put("message", "새로운 기기에서 로그인되었습니다: " + deviceType);
+
+        String jsonMessage;
+        try {
+            jsonMessage = new ObjectMapper().writeValueAsString(notification);
+        } catch (JsonProcessingException e) {
+            log.error("[알림 전송 실패] JSON 변환 오류: {}", e.getMessage());
+            return;
+        }
+        log.info("[알림 전송] JSON 메시지: {}", jsonMessage);
+        
+        for (WebSocketSession webSocket : webSocketSessions) {
+            Long sId = (Long) webSocket.getAttributes().get("sessionId");
+            log.info("[알림 전송] 세션 확인: sessionId={}, excludeSessionId={}, equals={}", 
+                     sId, newSessionId, sId != null && sId.equals(newSessionId));
+            
+            // 새로 로그인한 기기에는 알림 보내지 않음
+            if (sId != null && !sId.equals(newSessionId)) {
+                try {
+                    webSocket.sendMessage(new TextMessage(jsonMessage));
+                    log.info("[알림 전송 완료] sessionId={}", sId);
+                } catch (Exception e) {
+                    log.error("[알림 전송 실패] sessionId={}, error={}", sId, e.getMessage());
+                }
+            }
+        }
     }
 }

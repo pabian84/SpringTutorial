@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { WebSocketMessage, WebSocketSendMessage } from '../types/dtos';
 import { WebSocketContext, isWebSocketMessage } from './WebSocketContext';
-import { checkAuthStatus, isAuthenticated } from '../utils/authUtility';
+import { checkAuthStatus, isAuthenticated, getIsLoggingOut, setIsLoggingOut } from '../utils/authUtility';
 import { AUTH_CONSTANTS } from '../constants/auth';
 import { devLog } from '../utils/logger';
 
@@ -12,7 +12,6 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const isConnectingRef = useRef(false);
-  const isLoggedOutRef = useRef(false); // 로그아웃 후 재연결 방지
 
   // useCallback 참조 저장 (재귀 호출용)
   const connectSocketRef = useRef<(() => void) | null>(null);
@@ -21,8 +20,8 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   const WS_URL = `${protocol}//${window.location.host}`;
 
   const connectSocket = useCallback(async () => {
-    // 로그아웃 후 재연결 방지
-    if (isLoggedOutRef.current) {
+    // 로그아웃 중이면 연결하지 않음
+    if (getIsLoggingOut()) {
       return;
     }
 
@@ -84,6 +83,25 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     ws.onclose = async (event: CloseEvent) => {
       isConnectingRef.current = false;
 
+      // 4001 (Force Logout): 기기 강퇴 또는 세션 초과
+      // 재연결하지 않고 로그아웃 이벤트 발생
+      if (event.code === 4001) {
+        devLog('[WebSocket] Force Logout (4001)');
+        setIsConnected(false);
+        socketRef.current = null;
+        setIsLoggingOut(true);
+        // 로그아웃 이벤트 발생 → AuthProvider에서 처리
+        window.dispatchEvent(new CustomEvent('authLogout'));
+        return;
+      }
+
+      // 로그아웃 중이면 재연결하지 않음
+      if (getIsLoggingOut()) {
+        setIsConnected(false);
+        socketRef.current = null;
+        return;
+      }
+
       // 인증 상태 확인 후 재연결 여부 결정
       const isAuth = await isAuthenticated();
       if (!isAuth) {
@@ -130,8 +148,6 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     };
 
     const handleLogout = () => {
-      isLoggedOutRef.current = true; // 로그아웃 상태로 설정
-
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
@@ -154,8 +170,8 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   // 초기 연결 시도
   useEffect(() => {
     const timer = setTimeout(async () => {
-      // 로그아웃 상태면 연결하지 않음
-      if (isLoggedOutRef.current) {
+      // 로그아웃 중이면 연결하지 않음
+      if (getIsLoggingOut()) {
         return;
       }
 
@@ -181,7 +197,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
   const forceReconnect = useCallback(async () => {
     const isAuth = await isAuthenticated();
-    isLoggedOutRef.current = false;
+    setIsLoggingOut(false);
 
     if (!isAuth) {
       return;
@@ -198,7 +214,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   // 로그아웃 시 WebSocket 강제 종료
   const forceDisconnect = useCallback(() => {
     devLog('[WebSocketProvider] WebSocket 강제 종료');
-    isLoggedOutRef.current = true; // 재연결 방지
+    setIsLoggingOut(true);
 
     if (socketRef.current) {
       socketRef.current.close();

@@ -161,13 +161,23 @@ export interface ForceLogoutMessage {
   reason?: string;
 }
 
+// 5. 새 기기 로그인 알림 (UserService.java - notifyNewDeviceLogin)
+export interface NewDeviceLoginMessage {
+  type: 'NEW_DEVICE_LOGIN';
+  deviceType: string;
+  ipAddress: string;
+  timestamp: number;
+  message: string;
+}
+
 // 모든 소켓 메시지의 합집합 (Discriminated Union)
 export type WebSocketMessage =
   | SystemStatusMessage
   | UserUpdateMessage
   | ChatMessage
   | MemoUpdateMessage
-  | ForceLogoutMessage;
+  | ForceLogoutMessage
+  | NewDeviceLoginMessage;
 
 // 클라이언트 발신용 타입
 export interface SendChatMessage {

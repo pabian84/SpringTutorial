@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthProvider';
 import { useAuth } from './contexts/AuthContext';
 import { WebSocketProvider } from './contexts/WebSocketProvider';
+import { useWebSocket } from './contexts/WebSocketContext';
 import { useEffect } from 'react';
 import CesiumDetail from './pages/CesiumDetail';
 import Dashboard from './pages/Dashboard';
@@ -11,6 +12,8 @@ import ThreeJsDetail from './pages/ThreeJsDetail';
 import UserDetail from './pages/UserDetail';
 import WeatherDetail from './pages/WeatherDetail';
 import NotFound from './pages/NotFound';
+import { showToast } from './utils/Alert';
+import type { NewDeviceLoginMessage } from './types/dtos';
 import './styles/toast.css';
 
 // Public Route - 로그인 되어 있으면 대시보드로 (로딩 상태 포함)
@@ -49,6 +52,19 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
+  const { lastMessage } = useWebSocket();
+
+  // WebSocket 메시지 처리 (새 기기 로그인 알림)
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    // 새 기기 로그인 알림
+    if (lastMessage.type === 'NEW_DEVICE_LOGIN') {
+      const loginMessage = lastMessage as NewDeviceLoginMessage;
+      showToast(loginMessage.message, 'warning');
+    }
+  }, [lastMessage]);
+
   return (
     <>
       <Routes>

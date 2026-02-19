@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import com.example.demo.domain.user.dto.UserRes;
 import com.example.demo.domain.user.entity.AccessLog;
 import com.example.demo.domain.user.entity.Session;
 import com.example.demo.domain.user.entity.User;
+import com.example.demo.domain.user.event.NewDeviceLoginEvent;
 import com.example.demo.domain.user.mapper.SessionMapper;
 import com.example.demo.domain.user.mapper.UserMapper;
 import com.example.demo.global.constant.SecurityConstants;
@@ -23,7 +25,7 @@ import com.example.demo.global.exception.ErrorCode;
 import com.example.demo.global.security.JwtTokenProvider;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j; // [추가 1] 로그 기능 임포트
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -31,9 +33,10 @@ import lombok.extern.slf4j.Slf4j; // [추가 1] 로그 기능 임포트
 public class UserService {
     private final UserMapper userMapper;
     private final SessionMapper sessionMapper;
-    private final PasswordEncoder passwordEncoder; // 암호화 기계
-    private final JwtTokenProvider jwtTokenProvider; // 토큰 발급기
+    private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
     private final AccessLogService accessLogService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
@@ -54,6 +57,11 @@ public class UserService {
         // 세션 insert 직전에 실행
         // "이 유저의 세션이 5개를 넘어가면, 제일 오래된 거 하나 지워라"
         List<Session> sessions = sessionMapper.findByUserId(user.getId());
+        
+        // [새 기기 로그인 알림] 기존 세션이 있으면 알림 전송
+        boolean hasExistingSessions = !sessions.isEmpty();
+        log.info("[로그인] userId={}, 기존 세션 수={}, 알림 전송 여부={}", user.getId(), sessions.size(), hasExistingSessions);
+        
         if (sessions.size() >= 5) {
             // lastAccessedAt으로 정렬되어 있다고 가정할 때, 가장 뒤(오래된) 세션 삭제
             // 혹은 DB 쿼리로 "DELETE ... ORDER BY last_accessed_at ASC LIMIT 1" 실행
@@ -87,6 +95,11 @@ public class UserService {
         userMapper.updateStatus(user.getId(), true);
         // 로그 저장
         accessLogService.saveLog(user.getId(), session.getId(), SecurityConstants.TYPE_LOGIN, ipAddress, null, userAgent, "/api/user/login");
+
+        // [새 기기 로그인 알림] 기존 기기에 WebSocket으로 알림 전송
+        if (hasExistingSessions) {
+            notifyNewDeviceLogin(user.getId(), session.getId(), detectDeviceType(userAgent), ipAddress);
+        }
 
         // 5. 결과 반환 (쿠키 설정은 컨트롤러에게 위임)
         return LoginRes.builder()
@@ -154,5 +167,14 @@ public class UserService {
         if (userAgent.contains("Mobile")) return "mobile";
         if (userAgent.contains("Tablet")) return "tablet";
         return "desktop";
+    }
+
+    /**
+     * 새 기기 로그인 알림 전송 (이벤트 발행)
+     * 순환 참조 방지를 위해 이벤트 기반으로 처리
+     */
+    private void notifyNewDeviceLogin(String userId, Long newSessionId, String deviceType, String ipAddress) {
+        eventPublisher.publishEvent(new NewDeviceLoginEvent(this, userId, newSessionId, deviceType, ipAddress));
+        log.info("[새 기기 로그인 이벤트 발행] userId={}, device={}", userId, deviceType);
     }
 }

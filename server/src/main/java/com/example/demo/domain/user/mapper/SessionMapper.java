@@ -58,4 +58,8 @@ public interface SessionMapper {
     // 8. keepLogin 조회
     @Select("SELECT keep_login FROM user_sessions WHERE id = #{sessionId}")
     Boolean getKeepLoginBySessionId(@Param("sessionId") Long sessionId);
+
+    // 9. 마지막 접속 시간 업데이트 (API 호출 시)
+    @Update("UPDATE user_sessions SET last_accessed_at = NOW() WHERE id = #{sessionId}")
+    void updateLastAccessedAt(@Param("sessionId") Long sessionId);
 }

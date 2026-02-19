@@ -3,6 +3,18 @@ import axios from 'axios';
 import { devError } from './logger';
 
 // ============================================
+// 인증 상태 플래그 (중앙화)
+// ============================================
+
+let isLoggingIn = false;   // 로그인 진행 중
+let isLoggingOut = false;  // 로그아웃 진행 중
+
+export const setIsLoggingIn = (value: boolean) => { isLoggingIn = value; };
+export const getIsLoggingIn = () => isLoggingIn;
+export const setIsLoggingOut = (value: boolean) => { isLoggingOut = value; };
+export const getIsLoggingOut = () => isLoggingOut;
+
+// ============================================
 // 인증 확인 (Singleton Pattern + TTL)
 // 중복 API 호출 방지 + 캐시 만료 관리
 // ============================================
@@ -38,10 +50,24 @@ const isCacheValid = (): boolean => {
  * 인증 상태 확인 API 호출
  * - 한 번만 호출하고 결과를 캐싱 (TTL 적용)
  * - 로그아웃 시 resetAuthCheck() 호출 필요
+ * - 로그인/로그아웃 진행 중에는 캐시된 결과 반환
  * 
  * @returns 인증 결과 { authenticated: boolean, user?: UserInfo }
  */
 export const checkAuthStatus = async (): Promise<{ authenticated: boolean; user?: UserInfo }> => {
+  // 로그인 진행 중이면 캐시된 결과 반환 (없으면 인증 안됨으로 처리)
+  if (isLoggingIn) {
+    if (isCacheValid()) {
+      return cachedAuthResult!.result;
+    }
+    return { authenticated: false };
+  }
+
+  // 로그아웃 진행 중이면 무조건 인증 안됨
+  if (isLoggingOut) {
+    return { authenticated: false };
+  }
+
   // 캐시가 유효하면 캐시된 결과 반환
   if (isCacheValid()) {
     return cachedAuthResult!.result;

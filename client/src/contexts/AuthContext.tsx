@@ -17,7 +17,7 @@ export interface AuthContextType {
   isLoading: boolean;
   user: UserInfo | null;
   login: (id: string, password: string, keepLogin: boolean) => Promise<void>;
-  logout: (reason?: string) => void;
+  logout: (reason?: string, force?: boolean) => void;
   checkAuth: () => Promise<boolean>;
 }
 

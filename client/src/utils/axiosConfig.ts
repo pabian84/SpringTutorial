@@ -1,6 +1,5 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from 'axios';
-import { showToast } from './Alert';
-import { resetAuthCheck, checkAuthStatus } from './authUtility';
+import { resetAuthCheck, checkAuthStatus, getIsLoggingOut, setIsLoggingOut } from './authUtility';
 
 // ============================================
 // 인증 재시도 큐 (401/403/404 에러 시 요청 일시정지)
@@ -17,10 +16,6 @@ const authRetryQueue: RetryRequest[] = [];
 // 상태 관리 플래그
 // ============================================
 let isProcessingError = false;  // 인증 에러 처리 중복 방지
-let isLoggingOut = false;        // 로그아웃 중복 방지
-// logout 상태를 외부에서 설정하기 위한 함수
-export const setLoggingOut = (value : boolean) => isLoggingOut = value;
-export const getLoggingOut = () => isLoggingOut;
 
 // ============================================
 // public 엔드포인트 확인
@@ -50,7 +45,7 @@ interface AuthErrorConfig {
 
 const handleAuthError = async (
   errorConfig: AuthErrorConfig,
-  onAuthFailed: (message: string, url: string) => void,
+  onAuthFailed: (message: string) => void,
   onAuthRestored: () => void
 ): Promise<boolean> => {
   // 이미 처리 중이면 중복 방지
@@ -59,7 +54,7 @@ const handleAuthError = async (
   }
 
   // 로그아웃 중이면 무시
-  if (isLoggingOut) {
+  if (getIsLoggingOut()) {
     return false;
   }
 
@@ -85,13 +80,13 @@ const handleAuthError = async (
     } else {
       // 인증 FAIL → 로그아웃 처리
       resetAuthCheck();
-      isLoggingOut = true;
+      setIsLoggingOut(true);
     }
   } catch {
-    isLoggingOut = true;
+    setIsLoggingOut(true);
   } finally {
     // 로그아웃 처리 시 큐 비우기
-    if (isLoggingOut) {
+    if (getIsLoggingOut()) {
       const errorMessage = errorConfig.status === 401 ? 'Session expired' : 
                            errorConfig.status === 403 ? 'Access denied' : 'Not found';
       authRetryQueue.forEach(({ reject }) => {
@@ -99,7 +94,7 @@ const handleAuthError = async (
       });
       authRetryQueue.length = 0;
       
-      onAuthFailed(errorConfig.message, errorConfig.url);
+      onAuthFailed(errorConfig.message);
     }
     isProcessingError = false;
   }
@@ -112,8 +107,8 @@ const handleAuthError = async (
 // ============================================
 
 interface InterceptorCallbacks {
-  onAuthFailed: (message: string, url: string) => void;  // 인증 실패 (로그인 페이지로)
-  onAuthRestored: () => void;                 // 인증 복구 (재연결 등)
+  onAuthFailed: (message: string) => void;  // 인증 실패 (로그아웃 처리)
+  onAuthRestored: () => void;               // 인증 복구 (재연결 등)
 }
 
 export const setupAxiosInterceptors = (callbacks: InterceptorCallbacks) => {
@@ -154,7 +149,7 @@ export const setupAxiosInterceptors = (callbacks: InterceptorCallbacks) => {
       return config;
     },
     (error: AxiosError) => {
-      showToast('요청 인터셉터');
+      // 요청 설정 오류는 조용히 실패
       return Promise.reject(error);
     }
   );
@@ -221,9 +216,8 @@ export const setupAxiosInterceptors = (callbacks: InterceptorCallbacks) => {
       // 404 Not Found (자원 문제)
       // ------------------------------------------
       if (status === 404) {
-        // S001은 이제 401이므로 404에서는 제외
-        // 404는 자원 문제이므로 토스트만 표시
-        showToast('데이터를 찾을 수 없습니다.', 'info');
+        // 404는 자원 문제이므로 각 컴포넌트에서 처리
+        // 여기서는 조용히 실패
         return Promise.reject(error);
       }
 

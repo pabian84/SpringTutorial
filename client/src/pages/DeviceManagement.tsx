@@ -82,8 +82,8 @@ export default function DeviceManagement() {
 
     try {
       await sessionApi.revokeAll();
-      // 중앙화된 logout 사용
-      logout('전체 로그아웃');
+      // 중앙화된 logout 사용 (force: true로 이미 세션이 삭제된 경우에도 실행)
+      logout('전체 로그아웃', true);
     } catch (e) {
       console.error(e);
       showToast('요청 실패', 'error');
