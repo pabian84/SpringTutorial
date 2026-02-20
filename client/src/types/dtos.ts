@@ -10,6 +10,7 @@ export interface UserDTO {
 export interface LoginResDTO {
   accessToken: string;
   user: UserDTO;
+  expiresIn?: number;  // 토큰 만료까지 남은 시간 (초 단위)
 }
 
 export interface RefreshSessionResDTO {

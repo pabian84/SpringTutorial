@@ -1,5 +1,5 @@
-import axios, { type InternalAxiosRequestConfig, type AxiosError } from 'axios';
-import { resetAuthCheck, checkAuthStatus, getIsLoggingOut, setIsLoggingOut } from './authUtility';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import { checkAuthStatus, getIsLoggingOut, isTokenExpiringSoon, refreshToken, resetAuthCheck, setIsLoggingOut } from './authUtility';
 
 // ============================================
 // 인증 재시도 큐 (401/403/404 에러 시 요청 일시정지)
@@ -20,12 +20,11 @@ let isProcessingError = false;  // 인증 에러 처리 중복 방지
 // ============================================
 // public 엔드포인트 확인
 // ============================================
-
 const PUBLIC_ENDPOINTS = [
   '/api/user/login',
   '/api/user/logout',
   '/api/auth/check',
-  '/api/sessions/refresh',
+  '/api/auth/refresh',
 ];
 
 const isPublicEndpoint = (url: string): boolean => {
@@ -35,7 +34,6 @@ const isPublicEndpoint = (url: string): boolean => {
 // ============================================
 // 인증 에러 공통 처리 함수
 // ============================================
-
 interface AuthErrorConfig {
   status: number;
   errorCode?: string;
@@ -105,7 +103,6 @@ const handleAuthError = async (
 // ============================================
 // Axios Interceptor 설정
 // ============================================
-
 interface InterceptorCallbacks {
   onAuthFailed: (message: string) => void;  // 인증 실패 (로그아웃 처리)
   onAuthRestored: () => void;               // 인증 복구 (재연결 등)
@@ -127,6 +124,23 @@ export const setupAxiosInterceptors = (callbacks: InterceptorCallbacks) => {
       // Public 엔드포인트는 통과
       if (isPublicEndpoint(url)) {
         return config;
+      }
+
+      // 로그아웃 중이면 요청 취소
+      if (getIsLoggingOut()) {
+        return Promise.reject(new Error('Logging out'));
+      }
+
+      // ============================================
+      // Proactive Refresh: 토큰 만료 임박 시 갱신
+      // ============================================
+      if (isTokenExpiringSoon()) {
+        const success = await refreshToken();
+        if (!success) {
+          // 갱신 실패 시 로그아웃 처리
+          setIsLoggingOut(true);
+          return Promise.reject(new Error('Token refresh failed'));
+        }
       }
 
       // 인증 재확인 후 대기 중인 요청이 있으면 토큰 주입

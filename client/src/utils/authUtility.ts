@@ -1,13 +1,17 @@
-// 인증 관련 유틸리티 (httpOnly 쿠키 기반)
+// ============================================
+// authUtility.ts
+// - httpOnly Cookie + Memory-based Token Expiration
+// - localStorage, BroadcastChannel, Refresh Token Rotation
+// ============================================
+
 import axios from 'axios';
 import { devError } from './logger';
 
 // ============================================
-// 인증 상태 플래그 (중앙화)
+// 1. Authentication State Flags (Centralized)
 // ============================================
-
-let isLoggingIn = false;   // 로그인 진행 중
-let isLoggingOut = false;  // 로그아웃 진행 중
+let isLoggingIn = false;   // Login in progress
+let isLoggingOut = false;  // Logout in progress
 
 export const setIsLoggingIn = (value: boolean) => { isLoggingIn = value; };
 export const getIsLoggingIn = () => isLoggingIn;
@@ -15,10 +19,99 @@ export const setIsLoggingOut = (value: boolean) => { isLoggingOut = value; };
 export const getIsLoggingOut = () => isLoggingOut;
 
 // ============================================
-// 인증 확인 (Singleton Pattern + TTL)
-// 중복 API 호출 방지 + 캐시 만료 관리
+// 2. Token Expiration Management (Memory-based)
 // ============================================
+// Memory variables (reset on page refresh)
+let tokenExpiresAt: number | null = null;
+let tokenDuration: number | null = null;  // 전체 토큰 유효시간 (ms)
 
+// 최소 갱신 임계값: 1분 (너무 잦은 갱신 방지)
+const MIN_REFRESH_THRESHOLD_MS = 60 * 1000;
+
+/**
+ * Set token expiration time (called on login/refresh)
+ * @param expiresInSeconds Token validity in seconds
+ */
+export const setTokenExpiration = (expiresInSeconds: number): void => {
+  tokenExpiresAt = Date.now() + (expiresInSeconds * 1000);
+  tokenDuration = expiresInSeconds * 1000;
+};
+
+/**
+ * Clear token expiration time (called on logout)
+ */
+export const clearTokenExpiration = (): void => {
+  tokenExpiresAt = null;
+  tokenDuration = null;
+};
+
+/**
+ * Get token expiration time
+ */
+export const getTokenExpiration = (): number | null => {
+  return tokenExpiresAt;
+};
+
+/**
+ * Check if token is expiring soon
+ * @returns true if less than 20% of total duration remaining (min 1 minute)
+ */
+export const isTokenExpiringSoon = (): boolean => {
+  if (!tokenExpiresAt || !tokenDuration) return false;
+  
+  const now = Date.now();
+  const remaining = tokenExpiresAt - now;
+  
+  // Already expired
+  if (remaining <= 0) return false;
+  
+  // 동적 임계값: 전체 시간의 20% (최소 1분)
+  const threshold = Math.max(tokenDuration * 0.2, MIN_REFRESH_THRESHOLD_MS);
+  
+  return remaining < threshold;
+};
+
+// ============================================
+// 3. Token Refresh (Memory-based, No BroadcastChannel)
+// ============================================
+let refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Refresh token
+ * - Single tab: simple refresh
+ * - Multi tab: each tab refreshes independently
+ * @returns Refresh success
+ */
+export const refreshToken = async (): Promise<boolean> => {
+  // Already refreshing, return existing promise
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+  
+  refreshPromise = (async () => {
+    try {
+      const response = await axios.post('/api/auth/refresh');
+      
+      if (response.data.success && response.data.expiresIn) {
+        // Update memory expiration time
+        setTokenExpiration(response.data.expiresIn);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      devError('[authUtility] Token refresh failed:', error);
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  
+  return refreshPromise;
+};
+
+// ============================================
+// 4. Auth Status Check (Singleton + TTL)
+// ============================================
 // 사용자 정보 타입
 interface UserInfo {
   id: string;
@@ -27,7 +120,7 @@ interface UserInfo {
 
 // 캐시된 인증 결과에 타임스탬프 추가 (TTL용)
 interface CachedAuthResult {
-  result: { authenticated: boolean; user?: UserInfo };
+  result: { authenticated: boolean; user?: UserInfo; expiresIn?: number };
   timestamp: number;
 }
 
@@ -42,8 +135,7 @@ let cachedAuthResult: CachedAuthResult | null = null;
  */
 const isCacheValid = (): boolean => {
   if (cachedAuthResult === null) return false;
-  const elapsed = Date.now() - cachedAuthResult.timestamp;
-  return elapsed < CACHE_TTL_MS;
+  return Date.now() - cachedAuthResult.timestamp < CACHE_TTL_MS;
 };
 
 /**
@@ -90,7 +182,13 @@ export const checkAuthStatus = async (): Promise<{ authenticated: boolean; user?
         authenticated: true,
         user: response.data.user as UserInfo
       };
-      // 캐시 저장 (현재 시간 포함)
+      
+      // Update token expiration from server response
+      if (response.data.expiresIn) {
+        setTokenExpiration(response.data.expiresIn);
+      }
+      
+      // Cache result
       cachedAuthResult = {
         result,
         timestamp: Date.now()
@@ -140,4 +238,39 @@ export const resetAuthCheck = (): void => {
 export const isAuthenticated = async (): Promise<boolean> => {
   const result = await checkAuthStatus();
   return result.authenticated;
+};
+
+// ============================================
+// 5. Background Token Refresh Timer
+// ============================================
+let backgroundRefreshTimer: number | null = null;
+
+/**
+ * 백그라운드 토큰 갱신 시작
+ * - 1분마다 토큰 만료 임박 여부 체크
+ * - 만료 임박 시 자동 갱신
+ */
+export const startBackgroundRefresh = (): void => {
+  if (backgroundRefreshTimer) return; // 이미 실행 중
+
+  // 1분마다 체크
+  backgroundRefreshTimer = window.setInterval(async () => {
+    if (isTokenExpiringSoon()) {
+      const success = await refreshToken();
+      if (!success) {
+        // 갱신 실패 시 타이머 정지 (로그아웃될 것임)
+        stopBackgroundRefresh();
+      }
+    }
+  }, 60 * 1000); // 1분
+};
+
+/**
+ * 백그라운드 토큰 갱신 정지
+ */
+export const stopBackgroundRefresh = (): void => {
+  if (backgroundRefreshTimer) {
+    window.clearInterval(backgroundRefreshTimer);
+    backgroundRefreshTimer = null;
+  }
 };

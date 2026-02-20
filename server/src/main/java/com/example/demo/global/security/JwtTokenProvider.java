@@ -202,4 +202,51 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload();
     }
+
+    // ============================================
+    // 토큰 갱신 관련 메서드
+    // ============================================
+
+    /**
+     * 토큰 만료 시간 반환
+     */
+    public Date getExpiration(String token) {
+        return parseClaims(token).getExpiration();
+    }
+
+    /**
+     * 토큰의 실제 남은 시간 계산 (초 단위)
+     * @param token JWT 토큰
+     * @return 남은 시간 (초), 만료되었으면 0
+     */
+    public long getTokenRemainingTime(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            Date expiration = claims.getExpiration();
+            long remainingMs = expiration.getTime() - System.currentTimeMillis();
+            return Math.max(0, remainingMs / 1000);
+        } catch (ExpiredJwtException e) {
+            log.debug("만료된 토큰: 남은 시간 0");
+            return 0;
+        } catch (Exception e) {
+            log.error("토큰 남은 시간 계산 오류: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * 토큰이 곧 만료되는지 확인
+     * @param token JWT 토큰
+     * @param thresholdSeconds 임계값 (초)
+     * @return 임계값 이내에 만료되면 true
+     */
+    public boolean isTokenExpiringSoon(String token, int thresholdSeconds) {
+        try {
+            Date expiration = getExpiration(token);
+            long remaining = expiration.getTime() - System.currentTimeMillis();
+            return remaining < (thresholdSeconds * 1000L);
+        } catch (ExpiredJwtException e) {
+            return true; // 이미 만료된 경우
+        }
+    }
 }

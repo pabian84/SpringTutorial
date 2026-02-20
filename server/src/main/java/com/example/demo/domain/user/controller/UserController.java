@@ -41,6 +41,7 @@ public class UserController {
     private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
     private final CookieUtil cookieUtil;
+    private final com.example.demo.global.config.JwtProperties jwtProperties;
 
     @Operation(summary = "로그인")
     @PostMapping("/login")
@@ -66,6 +67,10 @@ public class UserController {
             Map<String, Object> body = new HashMap<>();
             // accessToken은 httpOnly 쿠키로 전달되므로 응답 바디에는 포함하지 않음
             body.put("user", result.getUser());
+            // 토큰 만료 시간 (초) - Proactive Refresh용
+            body.put("expiresIn", req.isRememberMe() 
+                ? jwtProperties.getRefreshTokenValidityInSeconds() 
+                : jwtProperties.getAccessTokenValidityInSeconds());
             
             return ResponseEntity.ok(body);
         } catch (IllegalArgumentException e) {

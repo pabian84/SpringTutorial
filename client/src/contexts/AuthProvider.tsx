@@ -1,13 +1,13 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { checkAuthStatus, resetAuthCheck, setIsLoggingIn, setIsLoggingOut, getIsLoggingOut } from '../utils/authUtility';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { userApi } from '../api/userApi';
-import { setupAxiosInterceptors } from '../utils/axiosConfig';
-import { AuthContext } from './AuthContext';
-import { showAlert, showToast } from '../utils/Alert';
-import { devLog } from '../utils/logger';
 import { AUTH_CONSTANTS } from '../constants/auth';
 import { isAuthenticatedRef } from '../constants/authRef';
+import { showAlert, showToast } from '../utils/Alert';
+import { checkAuthStatus, clearTokenExpiration, getIsLoggingOut, resetAuthCheck, setIsLoggingIn, setIsLoggingOut, setTokenExpiration, startBackgroundRefresh, stopBackgroundRefresh } from '../utils/authUtility';
+import { setupAxiosInterceptors } from '../utils/axiosConfig';
+import { devLog } from '../utils/logger';
+import { AuthContext } from './AuthContext';
 import { useWebSocket } from './WebSocketContext';
 
 // 사용자 정보 타입
@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       const data = await userApi.login(id, password, keepLogin);
-      const { user } = data;
+      const { user, expiresIn } = data;
 
       if (user) {
         // 로그아웃 상태 리셋
@@ -51,6 +51,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // 인증 확인 결과 리셋
         resetAuthCheck();
+
+        // 토큰 만료 시간 저장 (서버 응답의 expiresIn 사용)
+        if (expiresIn) {
+          setTokenExpiration(expiresIn);
+        }
 
         // 상태 업데이트
         setAuthState({
@@ -127,6 +132,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 인증 확인 결과 리셋
     resetAuthCheck();
+
+    // 토큰 만료 시간 삭제 (Proactive Refresh용)
+    clearTokenExpiration();
 
     // 로컬 스토리지 선택적 정리
     const safeKeys = ['theme', 'language', 'sidebarState'];
@@ -205,6 +213,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       navigate('/', { replace: true });
     }
   }, [authState.authenticated, authState.loading, location.pathname, navigate]);
+
+  // ------------------------------------------
+  // 백그라운드 토큰 갱신 타이머
+  // ------------------------------------------
+  useEffect(() => {
+    if (authState.authenticated) {
+      startBackgroundRefresh();
+    } else {
+      stopBackgroundRefresh();
+    }
+    
+    return () => stopBackgroundRefresh();
+  }, [authState.authenticated]);
 
   // ------------------------------------------
   // 인증 확인 함수 (필요시 호출)
