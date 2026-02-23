@@ -1,16 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { sessionApi } from '../api/sessionApi';
 import { chatApi, financeApi, memoApi, statsApi } from '../api/widgetApi';
 import { isAuthenticatedRef } from '../constants/authRef';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusMessage } from '../types/dtos';
+import type { ChatMessage, CodeData, SystemStatusMessage } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
+import { AUTH_EVENTS } from '../utils/authUtility';
+import { devLog } from '../utils/logger';
 
 export const useDashboardData = () => {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
   const myId = user?.id;
@@ -19,7 +19,7 @@ export const useDashboardData = () => {
   const { lastMessage, sendMessage } = useWebSocket();
   
   // 상태 관리
-  const [chatMessages, setChatMessages] = useState<ChatHistoryDTO[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [serverData, setServerData] = useState<SystemStatusMessage[]>([]);
   
   // 주의: ProtectedRoute에서 이미 인증을 체크하므로 여기서는 중복 체크하지 않음
@@ -29,7 +29,7 @@ export const useDashboardData = () => {
   const { data: onlineUsers = [] } = useQuery({
     queryKey: ['onlineUsers'], 
     queryFn: sessionApi.getOnlineUsers,
-    enabled: isAuthenticatedRef.current,
+    enabled: !!isAuthenticatedRef.current,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
@@ -38,8 +38,8 @@ export const useDashboardData = () => {
     queryKey: ['exchangeData'],
     queryFn: financeApi.getExchangeRates,
     staleTime: 1000 * 60, // 1분 캐시
-    enabled: isAuthenticatedRef.current,
-    retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
+    enabled: !!isAuthenticatedRef.current,
+    retry: false,
   });
 
   // 4. 코드 통계 데이터
@@ -55,8 +55,8 @@ export const useDashboardData = () => {
       return chartData as CodeData[];
     },
     staleTime: 1000 * 60 * 10, // 10분 캐시
-    enabled: isAuthenticatedRef.current,
-    retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
+    enabled: !!isAuthenticatedRef.current,
+    retry: false,
   });
 
   // 5. 메모 데이터
@@ -68,43 +68,19 @@ export const useDashboardData = () => {
       }
        return await memoApi.getMemos(myId);
     },
-    enabled: isAuthenticatedRef.current,
+    enabled: !!isAuthenticatedRef.current && !!myId,
     refetchOnWindowFocus: false,
-    retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
+    retry: false,
+    staleTime: 0, // 메모 동기화를 위해 항상 낡은 상태로 유지
   });
-
-  // 메모 추가 핸들러
-  const handleAddMemo = useCallback(async (content: string) => {
-    if (!myId) return;
-    try {
-      await memoApi.addMemo(myId, content);
-      refetchMemos();
-    } catch (e) {
-      console.error("메모 추가 실패", e);
-      showToast('메모 저장 실패', 'error');
-    }
-  }, [myId, refetchMemos]);
-
-  // 메모 삭제 핸들러
-  const handleDeleteMemo = useCallback(async (id: number) => {
-    const result = await showConfirm('메모 삭제', '이 메모를 삭제하시겠습니까?');
-    if (result.isConfirmed) {
-      try {
-        await memoApi.deleteMemo(id);
-        showToast('메모가 삭제되었습니다.', 'success');
-        refetchMemos();
-      } catch (e) {
-        console.error("메모 삭제 실패", e);
-        showToast('삭제 중 오류가 발생했습니다.', 'error');
-      }
-    }
-  }, [refetchMemos]);
 
   // 6. 채팅 기록 (myId가 없으면 요청하지 않음)
   useQuery({
     queryKey: ['chatHistory'],
     queryFn: async () => {
-      if (!myId) return [];
+      if (!myId) {
+        return [];
+      }
       try {
         const data = await chatApi.getHistory();
         // API 응답(ChatHistoryDTO)을 소켓 메시지 타입(ChatMessage)으로 변환
@@ -123,57 +99,100 @@ export const useDashboardData = () => {
         return [];
       }
     },
-    enabled: isAuthenticatedRef.current,
+    enabled: !!isAuthenticatedRef.current && !!myId,
     refetchOnWindowFocus: false,
     retry: false, // 401 에러 시 재시도 안 함 (토스트 반복 방지)
   });
 
   // === [WebSocket 수신 처리] ===
   useEffect(() => {
-    if (!lastMessage) return;
+    if (!lastMessage) {
+      return;
+    }
 
-    // Discriminated Union 덕분에 switch-case에서 타입 추론 완벽 지원
-    switch (lastMessage.type) {
-      case 'SYSTEM_STATUS': {
-        // 여기서 lastMessage는 자동으로 SystemStatusMessage 타입이 됨
-        const statusMessage = lastMessage as SystemStatusMessage;
-        const init = (msg : SystemStatusMessage) => {
-            setServerData((prev) => {
-            const updated = [...prev, msg];
+    // 함수로 분리하여 useEffect 내 직접적인 setState 경고 해결
+    const handleIncomingMessage = async () => {
+      switch (lastMessage.type) {
+        case 'SYSTEM_STATUS': {
+          setServerData((prev) => {
+            const updated = [...prev, lastMessage];
             return updated.length > 20 ? updated.slice(updated.length - 20) : updated;
           });
-        };
-        // WebSocket 메시지 수신 시 상태 업데이트 (의도된 동작)
-        init(statusMessage);
-        break;
+          break;
+        }
+
+        case 'CHAT': {
+          setChatMessages((prev) => {
+            return [...prev, lastMessage];
+          });
+          break;
+        }
+
+        case 'USER_UPDATE': {
+          queryClient.invalidateQueries({ queryKey: ['onlineUsers'] });
+          break;
+        }
+
+        case 'MEMO_UPDATE': {
+          /**
+           * [해결] 메모 실시간 동기화 강화
+           * 1. invalidateQueries: 해당 유저의 메모 캐시를 무효화
+           * 2. refetchQueries: 모든 탭(백그라운드 포함)에서 즉시 새로운 네트워크 요청 발생
+           */
+          if (!lastMessage.userId || lastMessage.userId === myId) {
+            devLog('[WebSocket] 메모 갱신 신호 수신 -> 강제 업데이트');
+            await queryClient.refetchQueries({ 
+              queryKey: ['memos'], 
+              type: 'all', 
+              exact: false 
+            });
+          }
+          break;
+        }
+
+        case 'FORCE_LOGOUT': {
+          // 다른 기기에서 접속하여 강제 로그아웃됨
+          window.dispatchEvent(new CustomEvent(AUTH_EVENTS.REQUEST_LOGOUT, {
+            detail: { reason: '관리자 또는 보안 정책에 의해 로그아웃되었습니다.', force: true }
+          }));
+          break;
+        }
       }
+    };
 
-      case 'CHAT': {
-        // 여기서 lastMessage는 자동으로 ChatMessage 타입이 됨
-        const chatMessage = lastMessage as ChatMessage
-        const init = (msg : ChatMessage) => {
-            setChatMessages((prev) => [...prev, msg]);
-        };
-        init(chatMessage);
-        break;
-      }
+    handleIncomingMessage();
+  }, [lastMessage, queryClient, myId]);
 
-      case 'USER_UPDATE':
-        // 여기서 lastMessage는 UserUpdateMessage
-        queryClient.invalidateQueries({ queryKey: ['onlineUsers'] });
-        break;
-
-      case 'MEMO_UPDATE':
-        queryClient.invalidateQueries({ queryKey: ['memos'] });
-        break;
-
-      case 'FORCE_LOGOUT':
-        // 다른 기기에서 접속하여 강제 로그아웃됨
-        // logout() 호출로 서버 세션 정리 및 상태 초기화
-        logout('다른 기기에서 접속하여 로그아웃되었습니다.');
-        break;
+  // === [메모 추가 핸들러] ===
+  const handleAddMemo = useCallback(async (content: string) => {
+    if (!myId) {
+      return;
     }
-  }, [lastMessage, queryClient, navigate, logout]);
+    try {
+      await memoApi.addMemo(myId, content);
+      // 로컬 탭 즉시 갱신
+      refetchMemos();
+    } catch (e) {
+      console.error("메모 추가 실패", e);
+      showToast('메모 저장 실패', 'error');
+    }
+  }, [myId, refetchMemos]);
+
+  // === [메모 삭제 핸들러] ===
+  const handleDeleteMemo = useCallback(async (id: number) => {
+    const result = await showConfirm('메모 삭제', '이 메모를 삭제하시겠습니까?');
+    if (result.isConfirmed) {
+      try {
+        await memoApi.deleteMemo(id);
+        showToast('메모가 삭제되었습니다.', 'success');
+        // 로컬 탭 즉시 갱신
+        refetchMemos();
+      } catch (e) {
+        console.error("메모 삭제 실패", e);
+        showToast('삭제 중 오류가 발생했습니다.', 'error');
+      }
+    }
+  }, [refetchMemos]);
 
   // === [메시지 전송] ===
   const handleSendMessage = useCallback((text: string) => {
@@ -183,12 +202,16 @@ export const useDashboardData = () => {
     }
   }, [myId, sendMessage]);
 
-  // === [로그아웃 - 중앙화된 authUtility 사용] ===
-  const handleLogout = async () => {
-    logout('사용자 로그아웃');
-  };
+  // === [로그아웃 핸들러] ===
+  const handleLogout = useCallback(async () => {
+    const result = await showConfirm('로그아웃', '정말 로그아웃 하시겠습니까?');
+    if (result.isConfirmed) {
+      logout('사용자 로그아웃');
+    }
+  }, [logout]);
 
-  return {
+  // 리렌더링 최적화를 위한 반환값 메모이제이션
+  return useMemo(() => ({
     myId,
     onlineUsers,
     exchangeData,
@@ -200,5 +223,9 @@ export const useDashboardData = () => {
     handleDeleteMemo,
     handleSendMessage,
     handleLogout
-  };
+  }), [
+    myId, onlineUsers, exchangeData, codeData, memos, 
+    serverData, chatMessages, handleAddMemo, handleDeleteMemo, 
+    handleSendMessage, handleLogout
+  ]);
 };

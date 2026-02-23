@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import {
   FaArrowLeft,
   FaCheckCircle,
@@ -19,7 +19,12 @@ import { sessionApi } from '../api/sessionApi';
 import type { DeviceSessionDTO } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
 
-export default function DeviceManagement() {
+/**
+ * 기기 관리 페이지 컴포넌트
+ * [최적화] React.memo를 적용하여 부모(WebSocketProvider)의 고주파 데이터 업데이트 시 
+ * 불필요한 리렌더링과 그로 인한 UI 번쩍임(Flickering)을 방지합니다.
+ */
+const DeviceManagement = memo(function DeviceManagement() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [sessions, setSessions] = useState<DeviceSessionDTO[]>([]);
@@ -48,13 +53,13 @@ export default function DeviceManagement() {
     if (!result.isConfirmed) return;
 
     try {
-      await sessionApi.revokeSession(sessionId);
       if (isCurrent) {
-        // 중앙화된 logout 사용
-        logout('기기 로그아웃');
-      } else {
-        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        logout('접속이 해제되었습니다.');
+        return; 
       }
+      
+      await sessionApi.revokeSession(sessionId);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
       showToast('접속이 해제되었습니다.', 'success');
     } catch (e) {
       console.error(e);
@@ -82,7 +87,6 @@ export default function DeviceManagement() {
 
     try {
       await sessionApi.revokeAll();
-      // 중앙화된 logout 사용 (force: true로 이미 세션이 삭제된 경우에도 실행)
       logout('전체 로그아웃', true);
     } catch (e) {
       console.error(e);
@@ -119,7 +123,6 @@ export default function DeviceManagement() {
       minHeight: '100vh',
       backgroundColor: '#16213e',
     },
-    
     header: {
       display: 'flex',
       alignItems: 'center',
@@ -152,7 +155,6 @@ export default function DeviceManagement() {
       gap: '12px',
       lineHeight: '1',
     },
-    
     infoCard: {
       background: 'linear-gradient(90deg, #1f2937 0%, #253043 100%)',
       padding: '25px',
@@ -175,7 +177,6 @@ export default function DeviceManagement() {
       marginBottom: '8px',
       color: '#fff',
     },
-
     buttonGroup: {
       display: 'flex',
       gap: '12px',
@@ -183,7 +184,6 @@ export default function DeviceManagement() {
       flex: '1 1 300px',
       justifyContent: 'flex-end',
     },
-    
     actionButton: {
       flex: '1 1 0px',
       minWidth: '200px',
@@ -199,13 +199,11 @@ export default function DeviceManagement() {
       whiteSpace: 'nowrap' as const,
       transition: 'all 0.2s',
     },
-
     grid: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
       gap: '25px',
     },
-
     card: {
       background: '#1f2937',
       borderRadius: '16px',
@@ -315,12 +313,9 @@ export default function DeviceManagement() {
           onClick={() => navigate(-1)} 
           style={styles.backButton}
           title="뒤로 가기"
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#444'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = '#333'; }}
         >
           <FaArrowLeft size={18} />
         </button>
-        
         <h1 style={styles.title}>
           <FaShieldAlt size={28} style={{ color: '#4ade80' }} />
           기기 관리
@@ -334,33 +329,17 @@ export default function DeviceManagement() {
             현재 계정에 로그인된 기기 목록입니다. 본인이 아니라면 즉시 로그아웃 하세요.
           </p>
         </div>
-        
         <div style={styles.buttonGroup}>
           <button 
             onClick={handleLogoutOthers} 
-            style={{
-              ...styles.actionButton,
-              background: '#374151',
-              color: '#fff',
-              border: '1px solid #4b5563',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#4b5563'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#374151'; }}
+            style={{ ...styles.actionButton, background: '#374151', color: '#fff', border: '1px solid #4b5563' }}
           >
             <FaUserShield size={16} />
             현재 기기 외 모두 로그아웃
           </button>
-
           <button 
             onClick={handleLogoutAll} 
-            style={{
-              ...styles.actionButton,
-              background: 'rgba(239, 68, 68, 0.15)',
-              color: '#f87171',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'; }}
+            style={{ ...styles.actionButton, background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
           >
             <FaSignOutAlt size={16} />
             전체 로그아웃
@@ -376,7 +355,6 @@ export default function DeviceManagement() {
         ) : sessions.length > 0 ? (
           sessions.sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent)).map((session) => {
             const isCurrent = session.isCurrent;
-            
             const cardStyle = isCurrent 
               ? { ...styles.card, border: '1px solid rgba(16, 185, 129, 0.4)', boxShadow: '0 0 15px rgba(16, 185, 129, 0.1)' }
               : styles.card;
@@ -384,10 +362,7 @@ export default function DeviceManagement() {
             return (
               <div key={session.id} style={cardStyle}>
                 <div style={styles.cardHeader}>
-                  <div style={{ 
-                    ...styles.iconBox, 
-                    ...(isCurrent ? { background: 'rgba(16, 185, 129, 0.1)', color: '#34d399' } : {}) 
-                  }}>
+                  <div style={{ ...styles.iconBox, ...(isCurrent ? { background: 'rgba(16, 185, 129, 0.1)', color: '#34d399' } : {}) }}>
                     {getIcon(session.deviceType)}
                   </div>
                   {isCurrent && (
@@ -396,21 +371,12 @@ export default function DeviceManagement() {
                     </div>
                   )}
                 </div>
-
                 <div style={styles.cardBody}>
                   <h3 style={styles.deviceName} title={session.userAgent}>
                     {session.userAgent}
                   </h3>
-                  
-                  <div style={styles.infoRow}>
-                    <FaMapMarkerAlt size={14} /> {session.location}
-                  </div>
-                  
-                  <div style={styles.infoRow}>
-                    <span style={styles.labelIP}>IP</span>
-                    {session.ipAddress}
-                  </div>
-
+                  <div style={styles.infoRow}><FaMapMarkerAlt size={14} /> {session.location}</div>
+                  <div style={styles.infoRow}><span style={styles.labelIP}>IP</span> {session.ipAddress}</div>
                   <div style={{ ...styles.infoRow, marginTop: '12px' }}>
                     <FaClock size={14} />
                     <span style={{ color: isCurrent ? '#4ade80' : '#9ca3af', fontWeight: isCurrent ? 'bold' : 'normal' }}>
@@ -418,20 +384,8 @@ export default function DeviceManagement() {
                     </span>
                   </div>
                 </div>
-
                 <div style={styles.cardFooter}>
-                  <button 
-                    onClick={() => handleLogoutOne(session.id, isCurrent)}
-                    style={styles.logoutOneBtn}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = '#f87171';
-                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '#9ca3af';
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
+                  <button onClick={() => handleLogoutOne(session.id, isCurrent)} style={styles.logoutOneBtn}>
                     <FaTrashAlt size={14} /> 로그아웃
                   </button>
                 </div>
@@ -447,4 +401,6 @@ export default function DeviceManagement() {
       </div>
     </div>
   );
-}
+});
+
+export default DeviceManagement;

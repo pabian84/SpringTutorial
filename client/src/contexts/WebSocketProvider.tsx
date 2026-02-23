@@ -1,7 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+/**
+ * @file WebSocketProvider.tsx
+ * @description 웹소켓 연결 및 메시지 송수신 관리 (리렌더링 최적화 적용)
+ */
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { WebSocketMessage, WebSocketSendMessage } from '../types/dtos';
 import { WebSocketContext, isWebSocketMessage } from './WebSocketContext';
-import { checkAuthStatus, isAuthenticated, getIsLoggingOut, setIsLoggingOut } from '../utils/authUtility';
+import { AUTH_EVENTS, checkAuthStatus, isAuthenticated, getIsLoggingOut } from '../utils/authUtility';
 import { AUTH_CONSTANTS } from '../constants/auth';
 import { devLog } from '../utils/logger';
 
@@ -12,56 +17,27 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const isConnectingRef = useRef(false);
-
-  // useCallback 참조 저장 (재귀 호출용)
-  const connectSocketRef = useRef<(() => void) | null>(null);
+  const connectSocketRef = useRef<(() => Promise<void>) | null>(null);
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const WS_URL = `${protocol}//${window.location.host}`;
 
   const connectSocket = useCallback(async () => {
-    // [핵심] 맨 앞에서 연결 중 체크 (경쟁 조건 방지)
-    if (isConnectingRef.current) {
-      devLog('[WebSocket] 이미 연결 중, 요청 무시');
-      return;
-    }
-
-    // 로그아웃 중이면 연결하지 않음
-    if (getIsLoggingOut()) {
-      return;
-    }
-
-    // 이미 연결되어 있으면 건너뜀
+    if (isConnectingRef.current || getIsLoggingOut()) return;
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       setIsConnected(true);
       return;
     }
 
-    // [핵심] 연결 시작 플래그 설정 (비동기 작업 전)
     isConnectingRef.current = true;
-
     try {
-      // 인증 상태 확인 (비동기)
       const authResult = await checkAuthStatus();
       if (!authResult.authenticated) {
         isConnectingRef.current = false;
         return;
       }
 
-      // myId는 checkAuthStatus에서 가져옴
-      const myId = authResult.user?.id;
-      if (!myId) {
-        isConnectingRef.current = false;
-        return;
-      }
-
-      // 기존 소켓 정리
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-
-      // 쿠키가 자동으로 전송되므로 URL 파라미터에서 토큰 제거
-      // 서버의 JwtHandshakeInterceptor가 쿠키에서 토큰을 읽음
+      if (socketRef.current) socketRef.current.close();
       const ws = new WebSocket(`${WS_URL}/ws`);
 
       ws.onopen = () => {
@@ -79,157 +55,79 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
           if (isWebSocketMessage(rawData)) {
             setLastMessage(rawData);
           }
-        } catch {
-          // silent fail
-        }
+        } catch { /* silent fail */ }
       };
 
       ws.onclose = async (event: CloseEvent) => {
         isConnectingRef.current = false;
-
-        // 4001 (Force Logout): 기기 강퇴 또는 세션 초과
-        // 재연결하지 않고 로그아웃 이벤트 발생
-        if (event.code === 4001) {
-          devLog('[WebSocket] Force Logout (4001)');
-          setIsConnected(false);
-          socketRef.current = null;
-          setIsLoggingOut(true);
-          // 로그아웃 이벤트 발생 → AuthProvider에서 처리
-          window.dispatchEvent(new CustomEvent('authLogout'));
-          return;
-        }
-
-        // 로그아웃 중이면 재연결하지 않음
-        if (getIsLoggingOut()) {
-          setIsConnected(false);
-          socketRef.current = null;
-          return;
-        }
-
-        // 인증 상태 확인 후 재연결 여부 결정
-        const isAuth = await isAuthenticated();
-        if (!isAuth) {
-          setIsConnected(false);
-          socketRef.current = null;
-          return;
-        }
-
-        // 정상 종료 또는 로그인 페이지면 재연결하지 않음
-        if (event.code === 1000 || window.location.pathname === '/') {
-          setIsConnected(false);
-          socketRef.current = null;
-          return;
-        }
-
         setIsConnected(false);
         socketRef.current = null;
 
-        // 재연결 시도 (일반 재연결)
+        if (getIsLoggingOut()) return;
+
+        if (event.code === 4001) {
+          devLog('[WebSocket] 4001 강제 종료 수신');
+          window.dispatchEvent(new CustomEvent(AUTH_EVENTS.REQUEST_LOGOUT, { 
+            detail: { reason: '세션이 만료되었거나 관리자에 의해 종료되었습니다.', force: true } 
+          }));
+          return;
+        }
+
+        const isAuth = await isAuthenticated();
+        if (!isAuth || event.code === 1000 || window.location.pathname === '/') return;
+
         reconnectTimerRef.current = window.setTimeout(() => {
-          connectSocketRef.current?.();
+          if (connectSocketRef.current) connectSocketRef.current();
         }, AUTH_CONSTANTS.RECONNECT_DELAY_NORMAL);
       };
 
-      ws.onerror = () => {
-        isConnectingRef.current = false;
-      };
-
+      ws.onerror = () => { isConnectingRef.current = false; };
       socketRef.current = ws;
     } catch (error) {
       isConnectingRef.current = false;
-      devLog('[WebSocket] 연결 중 오류:', error);
+      devLog('[WebSocket] 연결 오류:', error);
     }
   }, [WS_URL]);
 
-  // connectSocket 참조 저장
   useEffect(() => {
     connectSocketRef.current = connectSocket;
   }, [connectSocket]);
 
-  // 로그인/로그아웃 이벤트 감지
   useEffect(() => {
-    const handleAuthLogin = async () => {
-      const isAuth = await isAuthenticated();
-      if (isAuth) {
-        connectSocket();
-      }
-    };
-
-    const handleLogout = () => {
+    const handleLoginSuccess = () => connectSocket();
+    const handleLogoutCompleted = () => {
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
-        setIsConnected(false);
       }
+      setIsConnected(false);
       if (reconnectTimerRef.current) {
         window.clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
     };
 
-    window.addEventListener('authLogin', handleAuthLogin);
-    window.addEventListener('authLogout', handleLogout);
+    window.addEventListener(AUTH_EVENTS.LOGIN_SUCCESS, handleLoginSuccess);
+    window.addEventListener(AUTH_EVENTS.LOGOUT_COMPLETED, handleLogoutCompleted);
+    
     return () => {
-      window.removeEventListener('authLogin', handleAuthLogin);
-      window.removeEventListener('authLogout', handleLogout);
+      window.removeEventListener(AUTH_EVENTS.LOGIN_SUCCESS, handleLoginSuccess);
+      window.removeEventListener(AUTH_EVENTS.LOGOUT_COMPLETED, handleLogoutCompleted);
     };
   }, [connectSocket]);
 
-  // 초기 연결 시도
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      // 로그아웃 중이면 연결하지 않음
-      if (getIsLoggingOut()) {
-        return;
-      }
-
-      const isAuth = await isAuthenticated();
-      if (isAuth) {
-        connectSocket();
-      }
-    }, AUTH_CONSTANTS.RECONNECT_DELAY_INITIAL);
-    return () => clearTimeout(timer);
-  }, [connectSocket]);
-
-  // 정리
-  useEffect(() => {
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-      if (reconnectTimerRef.current) {
-        window.clearTimeout(reconnectTimerRef.current);
-      }
-    };
-  }, []);
-
-  const forceReconnect = useCallback(async () => {
-    const isAuth = await isAuthenticated();
-    setIsLoggingOut(false);
-
-    if (!isAuth) {
-      return;
-    }
-    if (socketRef.current) {
-      socketRef.current.close();
-    }
+  const forceReconnect = useCallback(() => {
+    if (socketRef.current) socketRef.current.close();
     socketRef.current = null;
-    setTimeout(() => {
-      connectSocket();
-    }, AUTH_CONSTANTS.RECONNECT_DELAY_FORCE);
+    setTimeout(connectSocket, AUTH_CONSTANTS.RECONNECT_DELAY_FORCE);
   }, [connectSocket]);
 
-  // 로그아웃 시 WebSocket 강제 종료
   const forceDisconnect = useCallback(() => {
-    devLog('[WebSocketProvider] WebSocket 강제 종료');
-    setIsLoggingOut(true);
-
     if (socketRef.current) {
       socketRef.current.close();
       socketRef.current = null;
     }
     setIsConnected(false);
-
     if (reconnectTimerRef.current) {
       window.clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
@@ -242,14 +140,17 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     }
   }, []);
 
+  // [핵심] Context Value 메모이제이션: lastMessage가 변해도 다른 값의 참조는 유지하여 불필요한 리렌더링 방지
+  const contextValue = useMemo(() => ({
+    isConnected,
+    lastMessage,
+    sendMessage,
+    forceReconnect,
+    forceDisconnect
+  }), [isConnected, lastMessage, sendMessage, forceReconnect, forceDisconnect]);
+
   return (
-    <WebSocketContext.Provider value={{
-      isConnected,
-      lastMessage,
-      sendMessage,
-      forceReconnect,
-      forceDisconnect
-    }}>
+    <WebSocketContext.Provider value={contextValue}>
       {children}
     </WebSocketContext.Provider>
   );
