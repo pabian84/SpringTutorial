@@ -3,12 +3,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sessionApi } from '../api/sessionApi';
 import { chatApi, financeApi, memoApi, statsApi } from '../api/widgetApi';
+import { isAuthenticatedRef } from '../constants/authRef';
+import { useAuth } from '../contexts/AuthContext';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import type { ChatHistoryDTO, ChatMessage, CodeData, SystemStatusMessage } from '../types/dtos';
 import { showConfirm, showToast } from '../utils/Alert';
-import { useWebSocket } from '../contexts/WebSocketContext';
-
-import { useAuth } from '../contexts/AuthContext';
-import { isAuthenticatedRef } from '../constants/authRef';
 
 export const useDashboardData = () => {
   const navigate = useNavigate();
@@ -152,10 +151,10 @@ export const useDashboardData = () => {
       case 'CHAT': {
         // 여기서 lastMessage는 자동으로 ChatMessage 타입이 됨
         const chatMessage = lastMessage as ChatMessage
-        const init2 = (msg : ChatMessage) => {
+        const init = (msg : ChatMessage) => {
             setChatMessages((prev) => [...prev, msg]);
         };
-        init2(chatMessage);
+        init(chatMessage);
         break;
       }
 
@@ -174,7 +173,7 @@ export const useDashboardData = () => {
         logout('다른 기기에서 접속하여 로그아웃되었습니다.');
         break;
     }
-  }, [lastMessage, queryClient, navigate]);
+  }, [lastMessage, queryClient, navigate, logout]);
 
   // === [메시지 전송] ===
   const handleSendMessage = useCallback((text: string) => {
