@@ -82,7 +82,7 @@ public class SessionService {
      */
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
-    public void deleteSession(Long targetSessionId, Long currentSessionId) {
+    public void deleteSession(Long targetSessionId, Long currentSessionId, String ipAdress, String userAgent) {
         // 세션 조회
         Session targetSession = sessionMapper.findBySessionId(targetSessionId);
         // 권한 검사 (비즈니스 로직)
@@ -98,7 +98,7 @@ public class SessionService {
         sessionMapper.deleteBySessionId(targetSessionId);
         log.warn("delete " + currentUserId + ", targetSessionId: " + targetSessionId);
         // 로그 기록 (약식)
-        accessLogService.saveLog(currentUserId, currentSessionId, SecurityConstants.TYPE_KICK, null, null, null, null);
+        accessLogService.saveLog(currentUserId, currentSessionId, SecurityConstants.TYPE_KICK, ipAdress, null, userAgent, null);
     }
 
     /**

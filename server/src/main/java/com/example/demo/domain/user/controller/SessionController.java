@@ -47,7 +47,7 @@ public class SessionController {
     // [1] 특정 기기 추방 -> forceDisconnectOne 호출
     @Operation(summary = "특정 기기 강퇴 (Body 사용)")
     @PostMapping("/revoke")
-    public ResponseEntity<?> revokeSession(@RequestBody Map<String, Long> body, @AuthenticationPrincipal UserDetails userDetails, HttpServletRequest request) {
+    public ResponseEntity<?> revokeSession(@RequestBody Map<String, Long> body, @AuthenticationPrincipal UserDetails userDetails, HttpServletRequest request, HttpServletResponse response) {
         try {
             Long targetSessionId = body.get("targetSessionId");
             String currentUserId = userDetails.getUsername();
@@ -56,13 +56,20 @@ public class SessionController {
             // 헤더 대신 토큰에서 내 세션 ID 추출
             Long currentSessionId = jwtTokenProvider.getSessionId(token);
 
-            // [깔끔해짐] 서비스가 검증하고 삭제까지 다 함
-            sessionService.deleteSession(targetSessionId, currentSessionId);
+            String userAgent = request.getHeader("User-Agent");
+            String ipAddress = request.getRemoteAddr();
 
-            // 소켓 끊기 (이건 Presentation Layer인 컨트롤러가 Handler를 호출하는 게 맞음)
+            sessionService.deleteSession(targetSessionId, currentSessionId, ipAddress, userAgent);
             sessionService.forceDisconnectWebSocket(currentUserId, targetSessionId);
 
-            return ResponseEntity.ok("선택한 기기를 로그아웃 시켰습니다.");
+            // [중요] 만약 강퇴 대상이 '현재 내 세션'이라면 쿠키도 함께 삭제해야 함
+            if (targetSessionId.equals(currentSessionId)) {
+                boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
+                ResponseCookie accessCookie = cookieUtil.deleteCookie("accessToken", isHttps);
+                response.addHeader("Set-Cookie", accessCookie.toString());
+            }
+
+            return ResponseEntity.ok("해당 기기의 접속을 해제했습니다.");
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (SecurityException e) {
@@ -116,10 +123,9 @@ public class SessionController {
         // 소켓 끊기
         sessionService.forceDisconnectAll(userId);
 
-        // 환경별 쿠키 옵션 적용
+        // 전체 로그아웃이므로 내 쿠키도 당연히 삭제
         boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
         ResponseCookie accessCookie = cookieUtil.deleteCookie("accessToken", isHttps);
-
         response.addHeader("Set-Cookie", accessCookie.toString());
 
         return ResponseEntity.ok().body("전체 로그아웃 완료");

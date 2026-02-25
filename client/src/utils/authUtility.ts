@@ -16,6 +16,9 @@ export const AUTH_EVENTS = {
   REQUEST_LOGOUT: 'auth:request-logout'  // 로그아웃 요청 시 (External -> AuthProvider)
 } as const;
 
+// 탭 간 실시간 동기화를 위한 BroadcastChannel (멀티 탭 중복 로그인 방어용)
+const authSyncChannel = new BroadcastChannel('auth_sync_channel');
+
 // ============================================
 // 1. 인증 프로세스 상태 플래그
 // ============================================
@@ -33,7 +36,34 @@ export const setIsLoggingOut = (value: boolean) => { isLoggingOut = value; };
 export const getIsLoggingOut = () => isLoggingOut;
 
 // ============================================
-// 2. 토큰 만료 관리
+// 2. 멀티 탭 동기화 로직 (BroadcastChannel)
+// ============================================
+/**
+ * 다른 탭에 로그인 성공 사실을 알림
+ */
+export const broadcastLogin = () => {
+  authSyncChannel.postMessage({ type: 'LOGIN_SYNC' });
+};
+
+/**
+ * 다른 탭에 로그아웃 완료 사실을 알림
+ */
+export const broadcastLogout = () => {
+  authSyncChannel.postMessage({ type: 'LOGOUT_SYNC' });
+};
+
+/**
+ * 다른 탭으로부터의 인증 동기화 메시지를 수신
+ * @param onSync 동기화 메시지 수신 시 실행할 콜백
+ */
+export const listenAuthSync = (onSync: (type: 'LOGIN_SYNC' | 'LOGOUT_SYNC') => void) => {
+  authSyncChannel.onmessage = (event) => {
+    onSync(event.data.type);
+  };
+};
+
+// ============================================
+// 3. 토큰 만료 관리
 // ============================================
 let tokenExpiresAt: number | null = null;
 let tokenDuration: number | null = null;
@@ -60,7 +90,7 @@ export const isTokenExpiringSoon = (): boolean => {
 };
 
 // ============================================
-// 3. 토큰 자동 갱신
+// 4. 토큰 자동 갱신
 // ============================================
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -85,7 +115,7 @@ export const refreshToken = async (): Promise<boolean> => {
 };
 
 // ============================================
-// 4. 인증 상태 확인 (Promise Locking)
+// 5. 인증 상태 확인 (Promise Locking)
 // ============================================
 interface CachedAuthResult {
   result: { authenticated: boolean; user?: UserDTO; expiresIn?: number };
@@ -136,7 +166,7 @@ export const isAuthenticated = async (): Promise<boolean> => {
 };
 
 // ============================================
-// 5. 백그라운드 타이머
+// 6. 백그라운드 타이머
 // ============================================
 let backgroundRefreshTimer: number | null = null;
 export const startBackgroundRefresh = (): void => {

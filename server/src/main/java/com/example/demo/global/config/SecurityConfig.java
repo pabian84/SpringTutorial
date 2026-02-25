@@ -21,6 +21,7 @@ import com.example.demo.domain.user.mapper.SessionMapper;
 import com.example.demo.global.constant.SecurityConstants;
 import com.example.demo.global.security.JwtAuthenticationFilter;
 import com.example.demo.global.security.JwtTokenProvider;
+import com.example.demo.global.util.CookieUtil;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,6 +32,7 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final SessionMapper sessionMapper; // [추가] 필터에 넣어줘야 함
+    private final CookieUtil cookieUtil; // 필터 주입용
     // CorsProperties 설정 클래스 주입
     private final CorsProperties corsProperties;
 
@@ -52,19 +54,26 @@ public class SecurityConfig {
             .httpBasic(basic -> basic.disable()) // 기본 로그인 창 끄기
             .csrf(csrf -> csrf.disable()) // CSRF 끄기 (JWT 쓸 땐 필요 없음)
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) // CORS 설정 적용
-            .sessionManagement(session -> 
+            .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 끄기 (JWT 필수)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/user/login", "/api/user/logout", "/api/auth/check", "/ws", "/swagger-ui/**", "/v3/api-docs/**").permitAll() // 로그인, 로그아웃, 인증확인, 소켓, 문서는 통과
-                .anyRequest().authenticated() // 나머지는 출입증(JWT) 검사
+                .requestMatchers(
+                    "/ws",
+                    "/v3/api-docs/**", 
+                    "/swagger-ui/**", 
+                    "/api/user/login",
+                    "/api/user/logout",
+                    "/api/auth/check",
+                    "/api/auth/refresh"
+                ).permitAll()
+                .anyRequest().authenticated()
             )
-            // JWT 검사 필터를 먼저 실행
-            .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, sessionMapper), UsernamePasswordAuthenticationFilter.class);
+            // [수정] cookieUtil 추가 주입
+            .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, sessionMapper, cookieUtil), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // 3. CORS 설정 (프론트엔드 5173 포트 허용)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
