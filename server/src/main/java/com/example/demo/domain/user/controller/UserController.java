@@ -68,7 +68,7 @@ public class UserController {
                     log.info("[중복 로그인 차단] 이미 유효한 세션이 존재함. userId={}", userId);
                     return ResponseEntity.status(HttpStatus.CONFLICT).body("이미 다른 탭에서 로그인된 상태입니다.");
                 } else {
-                    log.warn("[유령 쿠키 발견] 토큰은 유효하나 DB 세션 없음. 쿠키 삭제 후 재로그인 허용.");
+                    log.warn("[유령 쿠키 발견] DB 세션 없음. 기존 쿠키 삭제.");
                     ResponseCookie deleteCookie = cookieUtil.deleteCookie("accessToken", isHttps);
                     response.addHeader("Set-Cookie", deleteCookie.toString());
                 }
@@ -80,18 +80,24 @@ public class UserController {
         }
 
         try {
+            // [추가] 기기 식별을 위한 deviceId 쿠키 추출
+            String deviceId = cookieUtil.extractTokenFromCookie(request, "deviceId");
+            
             String ipAddress = request.getRemoteAddr();
             String userAgent = request.getHeader("User-Agent");
-            LoginRes result = userService.login(req, userAgent, ipAddress);
-            int maxAge;
-            if (req.isRememberMe()) {
-                maxAge = 7 * 24 * 60 * 60; // 7일
-            } else {
-                maxAge = -1; // 세션 쿠키
-            }
-            // Access Token을 HttpOnly 쿠키로 설정
+            
+            // 서비스 호출 (deviceId 포함)
+            LoginRes result = userService.login(req, userAgent, ipAddress, deviceId);
+            
+            // 1. 액세스 토큰 쿠키 설정 (세션 기반)
+            int maxAge = req.isRememberMe() ? 7 * 24 * 60 * 60 : -1;
             ResponseCookie accessCookie = cookieUtil.createTokenCookie("accessToken", result.getAccessToken(), maxAge, isHttps);
             response.addHeader("Set-Cookie", accessCookie.toString());
+
+            // 2. 기기 식별 쿠키 설정 (영구적 - 1년)
+            // 브라우저를 닫아도 유지되어 동일 프로필 재접속 시 세션 재사용을 가능케 함
+            ResponseCookie deviceCookie = cookieUtil.createTokenCookie("deviceId", result.getDeviceId(), 365 * 24 * 60 * 60, isHttps);
+            response.addHeader("Set-Cookie", deviceCookie.toString());
 
             Map<String, Object> body = new HashMap<>();
             // accessToken은 httpOnly 쿠키로 전달되므로 응답 바디에는 포함하지 않음

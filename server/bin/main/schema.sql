@@ -20,6 +20,7 @@ CREATE TABLE if not exists user_sessions (
     user_agent VARCHAR(255),             -- 브라우저 정보
     ip_address VARCHAR(50),
     location VARCHAR(100),
+    device_id VARCHAR(100),            -- 접속 기기(브라우저 or 프로필) 고유 id
     keep_login BOOLEAN DEFAULT FALSE,     -- 로그인 유지 여부
     last_accessed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -33,6 +34,7 @@ CREATE TABLE if not exists access_log (
     session_id BIGINT,   -- 어떤 세션과 관련된 로그인지 추적 (UserSession의 ID)
     ip_address VARCHAR(50),
     location VARCHAR(100), -- 접속 국가/도시 정보 (보안 감사용)
+    device_id VARCHAR(100), -- 접속 기기(브라우저 or 프로필) 고유 id
     user_agent VARCHAR(255),
     browser VARCHAR(50), -- Chrome, Safari 등
     os VARCHAR(50),      -- Windows, Mac 등

@@ -8,6 +8,8 @@ const commonConfig = {
   color: '#ffffff',      // 흰색 글씨
   confirmButtonColor: '#e94560', // 선생님 포인트 컬러 (빨강)
   cancelButtonColor: '#4b5563',  // 회색
+  scrollbarPadding: false, // 팝업 시 스크롤바 조작에 의한 레이아웃 흔들림 차단
+  heightAuto: false, // SweetAlert2의 강제 body height 변경(번쩍임 주범) 차단
 };
 
 // 2. 일반 알림창 (확인 버튼 하나)

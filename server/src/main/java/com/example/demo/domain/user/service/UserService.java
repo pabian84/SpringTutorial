@@ -2,6 +2,7 @@ package com.example.demo.domain.user.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -38,57 +39,88 @@ public class UserService {
     private final AccessLogService accessLogService;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * 로그인 처리 (기기 식별 쿠키를 통한 세션 재사용 로직 포함)
+     * @param loginReq 로그인 요청 정보
+     * @param userAgent 브라우저 정보
+     * @param ipAddress IP 주소
+     * @param deviceId 쿠키로부터 전달받은 기기 식별자 (null 가능)
+     * @return 로그인 결과 (새로운 deviceId 포함)
+     */
     @Transactional
-    @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
-    public LoginRes login(LoginReq loginReq, String userAgent, String ipAddress) {
-        // 1. 유저 검증
+    @CacheEvict(value = "online_users", allEntries = true)
+    public LoginRes login(LoginReq loginReq, String userAgent, String ipAddress, String deviceId) {
+        // 1. 사용자 확인
         User user = userMapper.findById(loginReq.getId());
         if (user == null) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND); // Controller가 잡아서 401로 처리
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
         }
         if (!passwordEncoder.matches(loginReq.getPassword(), user.getPassword())) {
-            throw new CustomException(ErrorCode.INVALID_PASSWORD); // 비밀번호 틀림
+            throw new CustomException(ErrorCode.INVALID_PASSWORD);
         }
 
-        // 2. 토큰 생성
+        // 2. [핵심] 기존 세션 재사용 확인
+        Session session = null;
+        boolean isNewSession = true;
+        String finalDeviceId = deviceId;
+        // 토큰 생성 및 정보 업데이트
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
-        // 3. 중복 로그인 방지 & 세션 저장
-        // 세션 insert 직전에 실행
-        // "이 유저의 세션이 5개를 넘어가면, 제일 오래된 거 하나 지워라"
-        List<Session> sessions = sessionMapper.findByUserId(user.getId());
-        
-        // [새 기기 로그인 알림] 기존 세션이 있으면 알림 전송
-        boolean hasExistingSessions = !sessions.isEmpty();
-        log.info("[로그인] userId={}, 기존 세션 수={}, 알림 전송 여부={}", user.getId(), sessions.size(), hasExistingSessions);
-        
-        if (sessions.size() >= 5) {
-            // lastAccessedAt으로 정렬되어 있다고 가정할 때, 가장 뒤(오래된) 세션 삭제
-            // 혹은 DB 쿼리로 "DELETE ... ORDER BY last_accessed_at ASC LIMIT 1" 실행
-            Session oldest = sessions.get(sessions.size() - 1);
-            sessionMapper.deleteBySessionId(oldest.getId());
+        if (finalDeviceId != null) {
+            // 동일 유저 & 동일 기기 식별자로 기존 세션 조회
+            session = sessionMapper.findByUserIdAndDeviceId(user.getId(), finalDeviceId);
+            if (session != null) {
+                log.info("[세션 재사용] 기존 세션을 발견했습니다. SessionID={}, DeviceID={}", session.getId(), finalDeviceId);
+                isNewSession = false;
+                // 세션 정보 갱신
+                session.setRefreshToken(refreshToken);
+                session.setKeepLogin(loginReq.isRememberMe());
+                session.setIpAddress(ipAddress);
+                session.setUserAgent(userAgent);
+                sessionMapper.updateSession(session);
+            }
         }
 
-        // 로그인 성공 시 세션 정보 DB에 저장
-        Session session = Session.builder()
-            .userId(user.getId()) // User 객체 대신 ID String 사용
-            .refreshToken(refreshToken)
-            .deviceType(detectDeviceType(userAgent))
-            .userAgent(userAgent)
-            .ipAddress(ipAddress)
-            .location("Unknown")
-            .keepLogin(loginReq.isRememberMe())
-            .build(); // createdAt 등은 DB에서 NOW()로 처리하거나 여기서 넣거나
-        sessionMapper.insertSession(session);
+        // 3. 신규 기기인 경우 처리
+        if (isNewSession) {
+            // 기기 식별자가 없으면 새로 생성 (UUID)
+            if (finalDeviceId == null) {
+                finalDeviceId = UUID.randomUUID().toString();
+            }
 
-        // [확인용 로그]
-        if (session.getId() == null) {
-            log.error("CRITICAL: Session ID was NOT generated!");
+            // 새 세션 객체 생성
+            session = Session.builder()
+                .userId(user.getId())
+                .refreshToken(refreshToken)
+                .deviceType(detectDeviceType(userAgent))
+                .userAgent(userAgent)
+                .ipAddress(ipAddress)
+                .location("Unknown")
+                .deviceId(finalDeviceId)
+                .keepLogin(loginReq.isRememberMe())
+                .build();
+            
+            try {
+                // [중요] DB에 먼저 저장해야 MyBatis가 ID를 생성하여 채워줌
+                sessionMapper.insertSession(session);
+            } catch (Exception e) {
+                log.error(e.getMessage());
+            }
+        }        
+        
+        // [안전장치] 생성된 세션 ID 확인 (로그인 프로세스 보장)
+        if (session == null || session.getId() == null) {
+            log.error("CRITICAL: Session ID was NOT generated! isNewSession={}", isNewSession);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
-        
-        // 생성된 session.getId()를 가지고 Access Token 생성 (세션 바인딩)
-        // JwtTokenProvider에 createAccessToken(userId, sessionId) 메서드가 있어야 함
+
+        if (!isNewSession) {
+            // 기존 세션인 경우 리프레시 토큰 및 활동 시간 업데이트
+            sessionMapper.updateRefreshToken(session.getId(), refreshToken);
+            sessionMapper.updateLastAccessedAt(session.getId());
+        }
+
+        // 액세스 토큰 생성
         String accessToken = jwtTokenProvider.createAccessToken(user.getId(), session.getId());
 
         // 로그 및 상태 업데이트
@@ -96,15 +128,16 @@ public class UserService {
         // 로그 저장
         accessLogService.saveLog(user.getId(), session.getId(), SecurityConstants.TYPE_LOGIN, ipAddress, null, userAgent, "/api/user/login");
 
-        // [새 기기 로그인 알림] 기존 기기에 WebSocket으로 알림 전송
-        if (hasExistingSessions) {
+        // 새 기기 알림 (신규 세션일 때만 발송)
+        if (isNewSession) {
             notifyNewDeviceLogin(user.getId(), session.getId(), detectDeviceType(userAgent), ipAddress);
         }
 
-        // 5. 결과 반환 (쿠키 설정은 컨트롤러에게 위임)
+        // 로그인 결과 반환
         return LoginRes.builder()
                 .accessToken(accessToken)
                 .user(user)
+                .deviceId(finalDeviceId)
                 .build();
     }
 
@@ -164,8 +197,12 @@ public class UserService {
 
     // 간단한 기기 판별 메서드 (UserService 내부에 추가)
     private String detectDeviceType(String userAgent) {
-        if (userAgent.contains("Mobile")) return "mobile";
-        if (userAgent.contains("Tablet")) return "tablet";
+        if (userAgent.contains("Mobile")) {
+            return "mobile";
+        }
+        if (userAgent.contains("Tablet")) {
+            return "tablet";
+        }
         return "desktop";
     }
 

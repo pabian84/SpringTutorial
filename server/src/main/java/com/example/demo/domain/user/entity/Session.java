@@ -16,6 +16,7 @@ public class Session {
     private String userAgent;  // "Chrome on Windows 11"
     private String ipAddress;  // "192.168.0.1"
     private String location;   // "Suwon, KR" (IP로 조회)
+    private String deviceId;   // 기기 고유 아이디
     
     private LocalDateTime lastAccessedAt; // 마지막 활동 시간
     private LocalDateTime createdAt;      // 최초 로그인 시간

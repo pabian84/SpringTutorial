@@ -148,18 +148,14 @@ public class SessionService {
     }
 
     public void removeWebSocket(WebSocketSession session) throws JsonProcessingException {
-        log.warn("removeWebSocket 1");
         String userId = getUserIdFromWebSocketSession(session);
         if (userId != null) {
-            log.warn("removeWebSocket 2");
             Set<WebSocketSession> webSocketSessions = webSocketSessionsMap.get(userId);
             if (webSocketSessions != null) {
-                log.warn("removeWebSocket 3");
                 // 목록에서 제거
                 webSocketSessions.remove(session);
                 // 더 이상 남은 웹소켓이 없으면 오프라인 처리
                 if (webSocketSessions.isEmpty()) {
-                    log.warn("removeWebSocket 4");
                     webSocketSessionsMap.remove(userId);
                     userService.updateUserStatus(userId, false); // DB Offline 처리
 
@@ -168,8 +164,9 @@ public class SessionService {
                     data.put("onlineUserCount", webSocketSessionsMap.size());
 
                     webSocketHandler.broadcast(data);
+                    log.warn("{}의 웹 소켓 종료", userId);
                 } else {
-                    log.warn("removeWebSocket 5");
+                    //log.warn("removeWebSocket 5");
                 }
             }
         }
