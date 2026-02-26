@@ -94,9 +94,14 @@ public class SessionService {
         if (!targetSession.getUserId().equals(currentUserId)) {
             throw new CustomException(ErrorCode.NOT_MY_DEVICE);
         }
-        //DB 삭제
+        
+        // [수정] 모든 온라인 유저를 루프 도는 대신, 해당 유저의 소켓만 타겟팅하여 성능 최적화
+        forceDisconnectWebSocket(targetSession.getUserId(), targetSessionId);
+        
+        // DB 삭제
         sessionMapper.deleteBySessionId(targetSessionId);
         log.warn("delete " + currentUserId + ", targetSessionId: " + targetSessionId);
+        
         // 로그 기록 (약식)
         accessLogService.saveLog(currentUserId, currentSessionId, SecurityConstants.TYPE_KICK, ipAdress, null, userAgent, null);
     }
@@ -107,6 +112,9 @@ public class SessionService {
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
     public void deleteOtherSessions(String userId, Long currentSessionId) {
+        // [수정] WebSocket 강제 종료 호출
+        forceDisconnectWebSocketOthers(userId, currentSessionId);
+        
         sessionMapper.terminateOthers(userId, currentSessionId);
         // 로그 기록 (약식)
         accessLogService.saveLog(userId, currentSessionId, SecurityConstants.TYPE_KICK, null, null, null, "ALL_OTHERS");
@@ -118,6 +126,9 @@ public class SessionService {
     @Transactional
     @CacheEvict(value = "online_users", allEntries = true) // [캐시 무효화] 접속자 목록 캐시 삭제
     public void deleteAllSessions(String userId, Long currentSessionId) {
+        // [수정] WebSocket 강제 종료 호출
+        forceDisconnectWebSocketAll(userId);
+        
         sessionMapper.deleteByUserId(userId);
         // 로그 기록 (약식)
         accessLogService.saveLog(userId, currentSessionId, SecurityConstants.TYPE_KICK, null, null, null, "ALL_DEVICES");
@@ -191,34 +202,8 @@ public class SessionService {
         }
     }
 
-    /**
-     * 특정 sessionId로 WebSocket 강제 종료
-     * (sessionId 기반으로 정확한 세션만 끊음)
-     */
-    public void forceDisconnectWebSocket(Long sessionId) {
-        // 현재 접속 중인 모든 세션에서 해당 sessionId 찾기
-        for (Map.Entry<String, Set<WebSocketSession>> entry : webSocketSessionsMap.entrySet()) {
-            String userId = entry.getKey();
-            Set<WebSocketSession> webSocketSessions = entry.getValue();
-            
-            for (WebSocketSession webSocket : webSocketSessions) {
-                Long sId = (Long) webSocket.getAttributes().get("sessionId");
-                if (sId != null && sId.equals(sessionId)) {
-                    try {
-                        log.info("WebSocket 강제 종료: UserId={}, SessionId={}", userId, sessionId);
-                        webSocket.close(new CloseStatus(4001, "Logout"));
-                    } catch (Exception e) {
-                        log.error("WebSocket 종료 중 에러", e);
-                    }
-                    return; // 하나 찾으면 종료
-                }
-            }
-        }
-        log.debug("WebSocket 세션 찾기 실패: sessionId={}", sessionId);
-    }
-
     // [2] 나 빼고 나머지 다 로그아웃
-    public void forceDisconnectOthers(String userId, Long mySessionId) {
+    public void forceDisconnectWebSocketOthers(String userId, Long mySessionId) {
         Set<WebSocketSession> webSocketSessions = webSocketSessionsMap.get(userId);
         if (webSocketSessions == null) return;
 
@@ -237,7 +222,7 @@ public class SessionService {
     }
     
     // [3] 전부 다 로그아웃
-    public void forceDisconnectAll(String userId) {
+    public void forceDisconnectWebSocketAll(String userId) {
         Set<WebSocketSession> webSocketSessions = webSocketSessionsMap.get(userId);
         if (webSocketSessions != null) {
             for (WebSocketSession webSocket : webSocketSessions) {

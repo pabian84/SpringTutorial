@@ -97,7 +97,7 @@ public class SessionController {
         // DB 삭제 실행
         sessionService.deleteOtherSessions(userId, currentSessionId);
         // 소켓 끊기
-        sessionService.forceDisconnectOthers(userId, currentSessionId);
+        sessionService.forceDisconnectWebSocketOthers(userId, currentSessionId);
 
         return ResponseEntity.ok("다른 모든 기기에서 로그아웃 되었습니다.");
     }
@@ -121,7 +121,7 @@ public class SessionController {
         // DB 삭제
         sessionService.deleteAllSessions(userId, currentSessionId);
         // 소켓 끊기
-        sessionService.forceDisconnectAll(userId);
+        sessionService.forceDisconnectWebSocketAll(userId);
 
         // 전체 로그아웃이므로 내 쿠키도 당연히 삭제
         boolean isHttps = "https".equalsIgnoreCase(request.getScheme());
