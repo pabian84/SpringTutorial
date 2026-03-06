@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { AccessLogDTO, LoginResDTO, UserDTO } from '../types/dtos';
+import type { AccessLogDTO, LoginResDTO, UserDTO, UserSettingsDTO } from '../types/dtos';
 
 export const userApi = {
   // 로그인
@@ -28,6 +28,16 @@ export const userApi = {
 
   logs: async () => {
     const { data } = await axios.get<AccessLogDTO[]>('/api/users/logs');
+    return data;
+  },
+
+  getSettings: async () => {
+    const { data } = await axios.get('/api/user/settings');
+    return data;
+  },
+
+  updateSettings: async (settings: Partial<UserSettingsDTO>) => {
+    const { data } = await axios.put('/api/user/settings', settings);
     return data;
   }
 };

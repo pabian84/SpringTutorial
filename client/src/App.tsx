@@ -8,7 +8,7 @@ import CesiumDetail from './pages/CesiumDetail';
 import Dashboard from './pages/Dashboard';
 import DeviceManagement from './pages/DeviceManagement';
 import Login from './pages/Login';
-import ThreeJsDetail from './pages/ThreeJsDetail';
+import Settings from './pages/Settings';
 import UserDetail from './pages/UserDetail';
 import WeatherDetail from './pages/WeatherDetail';
 import NotFound from './pages/NotFound';
@@ -73,8 +73,9 @@ function AppContent() {
         <Route path="/user/:userId" element={<UserDetail />} />
         <Route path="/weather" element={<WeatherDetail />} />
         <Route path="/cesium" element={<CesiumDetail />} />
-        <Route path="/threejs" element={<ThreeJsDetail />} />
+        {/* <Route path="/threejs" element={<ThreeJsDetail />} /> */}
         <Route path="/devices" element={<DeviceManagement />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

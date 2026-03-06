@@ -29,6 +29,13 @@ export interface DeviceSessionDTO {
   isCurrent: boolean; // 내가 이 기기인지 여부
 }
 
+export interface UserSettingsDTO {
+  userId: string;
+  googleCalendarId?: string;
+  googleApiKey?: string;
+  defaultAiEngine?: string;
+}
+
 export interface AccessLogDTO {
   id: number;           // Long -> number
   userId: string;
@@ -97,6 +104,19 @@ export interface MemoDTO {
   userId: string;
   content: string;    // 서버 Entity 기준
   createdAt?: string; // LocalDateTime -> string
+}
+
+export interface TodoDTO {
+  id: number;
+  userId: string;
+  title: string;
+  description?: string;
+  dueDate?: string; // LocalDateTime -> string (ISO format)
+  isCompleted: boolean;
+  source: string;
+  externalId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // 7. CodeStatsService.java 대응 (Map<String, Object> 반환)

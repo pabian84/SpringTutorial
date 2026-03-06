@@ -11,6 +11,32 @@ CREATE TABLE if not exists users (
     is_online BOOLEAN DEFAULT FALSE
 );
 
+-- 사용자 설정 테이블 (개인 비서 및 외부 연동 관리)
+CREATE TABLE if not exists user_settings (
+    user_id VARCHAR(50) PRIMARY KEY,
+    google_calendar_id VARCHAR(255),    -- 연동할 구글 캘린더 ID (이메일 주소 등)
+    google_api_key VARCHAR(255),        -- 구글 API 키 (읽기 전용)
+    default_ai_engine VARCHAR(50) DEFAULT 'google', -- 기본 검색/AI 엔진
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Smart To-Do 테이블 (자체 할 일 + 외부 캘린더 연동 대비)
+CREATE TABLE if not exists todos (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    due_date TIMESTAMP,                 -- 마감일 (D-Day 계산용)
+    is_completed BOOLEAN DEFAULT FALSE, -- 완료 여부
+    source VARCHAR(50) DEFAULT 'LOCAL', -- 'LOCAL' (내부 생성) or 'GOOGLE_CALENDAR'
+    external_id VARCHAR(255),           -- 외부 캘린더 고유 ID (추후 동기화 매핑용)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- 기기 관리용 세션 테이블
 CREATE TABLE if not exists user_sessions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

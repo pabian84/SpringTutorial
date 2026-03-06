@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { BiDetail } from 'react-icons/bi';
-import { FaChartLine, FaCode, FaComments, FaCube, FaDesktop, FaGlobeAsia, FaMapMarkedAlt, FaServer, FaSignOutAlt, FaStickyNote } from 'react-icons/fa';
+import { FaChartLine, FaCode, FaComments, FaDesktop, FaGlobeAsia, FaMapMarkedAlt, FaSearch, FaServer, FaSignOutAlt, FaStickyNote, FaCog, FaTasks } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import CesiumWidget from '../components/cesium/CesiumWidget';
 import ChatWidget from '../components/ChatWidget';
@@ -10,14 +10,15 @@ import ExchangeWidget from '../components/ExchangeWidget';
 import KakaoMapWidget from '../components/KakaoMapWidget';
 import MemoWidget from '../components/MemoWidget';
 import ServerMonitor from '../components/Servermonitor';
-import ThreeJsWidget from '../components/threejs/ThreeJsWidget';
+import SearchWidget from '../components/SearchWidget';
+import TodoWidget from '../components/TodoWidget';
 import WeatherWidget from '../components/WeatherWidget';
 import { useUserLocation } from '../contexts/UserLocationContext';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { devError, devLog } from '../utils/logger';
 
 // [설정] LocalStorage 키값
-const STORAGE_KEY = 'dashboard_layouts_v1';
+const STORAGE_KEY = 'dashboard_layouts_v2';
 
 // [서식 유지] 초기 레이아웃 설정 (Initial Layout Configuration)
 const defaultLayouts: RGL_Layouts = {
@@ -31,7 +32,8 @@ const defaultLayouts: RGL_Layouts = {
     { i: 'server', x: 0, y: 14, w: 6, h: 8 },
     { i: 'memo', x: 6, y: 14, w: 3, h: 8 },
     { i: 'chat', x: 9, y: 14, w: 3, h: 8 },
-    { i: 'three', x: 0, y: 24, w: 12, h: 10 },
+    { i: 'search', x: 0, y: 24, w: 6, h: 10 },
+    { i: 'todo', x: 6, y: 24, w: 6, h: 10 },
   ],
   md: [
     { i: 'weather', x: 0, y: 0, w: 7, h: 8 },
@@ -43,7 +45,8 @@ const defaultLayouts: RGL_Layouts = {
     { i: 'server', x: 0, y: 26, w: 10, h: 6 },
     { i: 'memo', x: 0, y: 32, w: 5, h: 8 },
     { i: 'chat', x: 5, y: 32, w: 5, h: 8 },
-    { i: 'three', x: 0, y: 40, w: 10, h: 8 },
+    { i: 'search', x: 0, y: 40, w: 5, h: 8 },
+    { i: 'todo', x: 5, y: 40, w: 5, h: 8 },
   ],
   sm: [
     { i: 'weather', x: 0, y: 0, w: 4, h: 8 },
@@ -55,7 +58,8 @@ const defaultLayouts: RGL_Layouts = {
     { i: 'server', x: 0, y: 32, w: 6, h: 6 },
     { i: 'memo', x: 0, y: 38, w: 3, h: 8 },
     { i: 'chat', x: 3, y: 38, w: 3, h: 8 },
-    { i: 'three', x: 0, y: 46, w: 6, h: 8 },
+    { i: 'search', x: 0, y: 46, w: 6, h: 8 },
+    { i: 'todo', x: 0, y: 54, w: 6, h: 8 },
   ],
   xs: [
     { i: 'weather', x: 0, y: 0, w: 4, h: 8 },
@@ -67,7 +71,8 @@ const defaultLayouts: RGL_Layouts = {
     { i: 'server', x: 0, y: 36, w: 4, h: 6 },
     { i: 'memo', x: 0, y: 42, w: 4, h: 6 },
     { i: 'chat', x: 0, y: 48, w: 4, h: 8 },
-    { i: 'three', x: 0, y: 57, w: 4, h: 8 },
+    { i: 'search', x: 0, y: 57, w: 4, h: 8 },
+    { i: 'todo', x: 0, y: 65, w: 4, h: 8 },
   ],
   xxs: [
     { i: 'weather', x: 0, y: 0, w: 2, h: 8 },
@@ -79,7 +84,8 @@ const defaultLayouts: RGL_Layouts = {
     { i: 'server', x: 0, y: 36, w: 2, h: 6 },
     { i: 'memo', x: 0, y: 42, w: 2, h: 6 },
     { i: 'chat', x: 0, y: 48, w: 2, h: 8 },
-    { i: 'three', x: 0, y: 56, w: 2, h: 8 },
+    { i: 'search', x: 0, y: 56, w: 2, h: 8 },
+    { i: 'todo', x: 0, y: 64, w: 2, h: 8 },
   ]
 };
 
@@ -174,18 +180,6 @@ export default function Dashboard() {
         <BiDetail size={20} />
       </button>
     );
-    // ThreeJS 상세 버튼
-    const threeDetailButton = (
-      <button
-        onClick={(e) => handleNavigate('/threejs', e)}
-        onAuxClick={(e) => handleNavigate('/threejs', e)}
-        onMouseDown={handleMouseDown}
-        title="상세 보기 (휠클릭/ Ctrl+Click: 새 탭)"
-        style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px', display: 'flex', transition: 'color 0.2s', marginRight: '5px' }}
-      >
-        <BiDetail size={20} />
-      </button>
-    );
 
     return [
       {
@@ -273,14 +267,18 @@ export default function Dashboard() {
         keepMounted: true, deferred: true
       },
       {
-        id: 'three',
-        title: '3D Robot Control',
-        icon: <FaCube style={{ color: '#d946ef' }} />,
-        content: <ThreeJsWidget />,
-        headerAction: threeDetailButton,
+        id: 'search',
+        title: 'AI Search Hub',
+        icon: <FaSearch style={{ color: '#00c6ff' }} />,
+        content: <SearchWidget />,
         keepMounted: true,
-        deferred: true,
-        idle: true
+      },
+      {
+        id: 'todo',
+        title: 'Smart To-Do',
+        icon: <FaTasks style={{ color: '#a855f7' }} />,
+        content: <TodoWidget />,
+        keepMounted: true,
       },
     ];
   }, [
@@ -311,6 +309,25 @@ export default function Dashboard() {
           <span style={{ color: 'var(--accent-color)', fontSize: '14px' }}>Logged in as {myId}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={(e) => handleNavigate('/settings', e)}
+            onAuxClick={(e) => handleNavigate('/settings', e)}
+            onMouseDown={handleMouseDown}
+            style={{
+              width: 'auto',
+              height: '75%',
+              padding: '5px 10px',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: '#4b5563',
+            }}
+            title="비서 환경 설정"
+          >
+            <FaCog size={16} />
+            {!isCompactMode && "설정"}
+          </button>
           <button
             onClick={(e) => handleNavigate('/devices', e)}
             onAuxClick={(e) => handleNavigate('/devices', e)}
